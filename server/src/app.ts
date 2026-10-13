@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
+import apiRouter from './routes';
 import { errorHandler } from './middlewares/errorHandler';
 import { env } from './config/env';
 
@@ -33,5 +34,7 @@ app.use(cookieParser());
 app.get('/api/v1/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });
 });
+
+app.use('/api/v1', apiRouter);
 
 app.use(errorHandler);
