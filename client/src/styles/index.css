@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Dynamic active-nav-item accent for AppLayout's dark sider.
+   Synchronized via CSS variable --theme-accent from ThemeContext. */
+.ant-layout-sider .ant-menu-item-selected {
+  border-left: 3px solid var(--theme-accent, #2dd4bf) !important;
+}
+
+/* Smooth transition when switching display modes or theme colors */
+.ant-layout,
+.ant-layout-sider,
+.ant-layout-header,
+.ant-layout-content,
+.ant-card,
+.ant-table,
+.ant-menu {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+/* ---------------------------------------------------------------- app header
+   The header is a brand-coloured bar (AppLayout), so its controls are light on
+   dark: a translucent pill for the employee search, white icons and text. */
+.app-header .header-search .ant-input-affix-wrapper {
+  height: 40px;
+  border-radius: 999px;
+  padding-inline: 14px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: none;
+}
+.app-header .header-search .ant-input-affix-wrapper:hover,
+.app-header .header-search .ant-input-affix-wrapper-focused {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: none;
+}
+.app-header .header-search .ant-input {
+  background: transparent;
+  color: #fff;
+}
+.app-header .header-search .ant-input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+.app-header .header-search .ant-input-prefix,
+.app-header .header-search .ant-input-clear-icon {
+  color: rgba(255, 255, 255, 0.8);
+}
+.app-header .header-kbd {
+  padding: 1px 8px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 20px;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
+}
+.app-header .ant-btn-text {
+  color: #fff;
+}
+.app-header .ant-btn-text:not(:disabled):hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}

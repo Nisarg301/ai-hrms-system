@@ -1,0 +1,40 @@
+export const ROUTES = {
+  login: '/login',
+  forgotPassword: '/forgot-password',
+  resetPassword: '/reset-password',
+  changePassword: '/change-password',
+  unauthorized: '/unauthorized',
+  adminUsers: '/admin-users',
+  roles: '/roles',
+  employees: '/employees',
+  documents: '/documents',
+  projects: '/projects',
+  tasks: '/tasks',
+  home: '/home',
+  /** My leave, profile, team and holidays: /me/leave, /me/profile, /me/team, /me/holidays. */
+  me: '/me',
+  meLeave: '/me/leave',
+  meHolidays: '/me/holidays',
+  /** ORG_ADMIN: the Approvals & leave group. */
+  leaveManagement: '/leave',
+  leaveApprovals: '/leave/approvals',
+  leaveTypes: '/leave/types',
+  holidays: '/leave/holidays',
+  teamAttendance: '/leave/team-attendance',
+  attendanceSettings: '/leave/attendance-settings',
+  /** ORG_ADMIN: everyone's expense claims, spending and categories. */
+  expenses: '/expenses',
+  /** ORG_ADMIN: the People ops group (onboarding, offboarding, checklist templates). */
+  peopleOps: '/people-ops',
+  peopleOpsOnboarding: '/people-ops/onboarding',
+  peopleOpsOffboarding: '/people-ops/offboarding',
+  peopleOpsTemplates: '/people-ops/templates',
+  /** Old landing page; redirects to Home. */
+  dashboard: '/dashboard',
+  departments: '/departments',
+  profile: '/profile',
+  plans: '/plans',
+  billing: '/billing',
+  exports: '/exports',
+  auditLogs: '/audit-logs',
+} as const;
