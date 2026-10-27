@@ -9,6 +9,7 @@ import { parsePaginationQuery } from '../utils/pagination';
 import { ITaskRecord } from '../models/task.model';
 import { userRepository } from '../repositories/user.repository';
 import { containsPattern } from '../utils/regex';
+import { listTasksQuerySchema } from '../validators/task.validators';
 
 async function serialize(t: ITaskRecord, projectName?: string) {
   let resolvedProjectName = projectName;
@@ -81,6 +82,16 @@ export const listTasks = asyncHandler(async (req: Request, res: Response) => {
   if (search) {
     filter.title = containsPattern(search);
   }
+  // Optional filters (the AI assistant asks for "my open tasks" or "overdue" with these).
+  const filters = listTasksQuerySchema.safeParse(req.query);
+  if (!filters.success) {
+    throw new ApiError(400, 'Validation failed', filters.error.flatten());
+  }
+  const { projectId, status, dueFrom, dueTo, memberId } = filters.data;
+  if (projectId) filter.projectId = new Types.ObjectId(projectId);
+  if (status) filter.status = { $in: status };
+  if (dueFrom || dueTo) filter.dueDate = { ...(dueFrom ? { $gte: dueFrom } : {}), ...(dueTo ? { $lte: dueTo } : {}) };
+  if (memberId) filter.userId = new Types.ObjectId(memberId);
   const { items, total } = await taskRepository.paginate({ filter, skip, limit, sortBy, sortDir });
   const projects = await projectRepository.find({ organizationId });
   const users = await userRepository.find({ organizationId });

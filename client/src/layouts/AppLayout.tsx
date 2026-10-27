@@ -14,7 +14,9 @@ import { Avatar, Badge, Layout, Menu, Dropdown, Space } from 'antd';
 import type { MenuProps } from 'antd';
 import { useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { AiAssistant } from '../components/AiAssistant/AiAssistant';
 import { BrandMark } from '../components/BrandMark/BrandMark';
+import { avatarColors, initialOf } from '../components/PersonAvatar/PersonAvatar';
 import { NotificationBell } from '../components/NotificationBell/NotificationBell';
 import { PeopleSearch } from '../components/PeopleSearch/PeopleSearch';
 import { PlanExpiryBanner } from '../components/PlanExpiryBanner/PlanExpiryBanner';
@@ -79,7 +81,8 @@ export function AppLayout() {
               <Link to={item.to}>{item.label}</Link>
             ),
         };
-  const initial = user?.name.charAt(0).toUpperCase() ?? '?';
+  // The same letter as every other avatar of this person (PersonAvatar).
+  const initial = user ? initialOf(user.name) : '?';
 
   const onSignOut = async () => {
     await dispatch(logout());
@@ -315,7 +318,8 @@ export function AppLayout() {
                 <Avatar
                   src={user?.avatar?.url}
                   style={{
-                    background: isDarkMode ? currentTokens.colorPrimary : currentTokens.colorPrimaryDeep,
+                    // The same colours as every other avatar (PersonAvatar); the ring sets it off from the header bar.
+                    ...avatarColors(currentTokens, isDarkMode),
                     border: '2px solid rgba(255, 255, 255, 0.7)',
                   }}
                 >
@@ -331,6 +335,7 @@ export function AppLayout() {
           <PlanExpiryBanner />
           <Outlet />
         </Layout.Content>
+        <AiAssistant />
       </Layout>
     </Layout>
   );

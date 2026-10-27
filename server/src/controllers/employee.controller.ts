@@ -16,6 +16,7 @@ import { announceStart } from '../services/lifecycleNotify.service';
 import { assertValidManager, effectiveJoiningDate } from '../services/people.service';
 import { containsPattern } from '../utils/regex';
 import { todayIso } from '../utils/dates';
+import { listEmployeesQuerySchema } from '../validators/employee.validators';
 
 /**
  * `canSeeBirthYear`: only an ORG_ADMIN (who maintains the record) gets the full date
@@ -178,6 +179,14 @@ export const listEmployees = asyncHandler(async (req: Request, res: Response) =>
   if (search) {
     filter.$or = [{ name: containsPattern(search) }, { email: containsPattern(search) }];
   }
+  // Optional filters (the AI assistant counts "employees in Engineering" with these).
+  const filters = listEmployeesQuerySchema.safeParse(req.query);
+  if (!filters.success) {
+    throw new ApiError(400, 'Validation failed', filters.error.flatten());
+  }
+  if (filters.data.department) filter.department = new Types.ObjectId(filters.data.department);
+  if (filters.data.status) filter.status = filters.data.status;
+  if (filters.data.roleId) filter.roleId = new Types.ObjectId(filters.data.roleId);
   const { items, total } = await userRepository.paginate({ filter, skip, limit, sortBy, sortDir });
   const roles = await roleRepository.find({ organizationId });
   const roleNameById = new Map(roles.map((r) => [r._id.toString(), r.name]));

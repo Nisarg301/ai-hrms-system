@@ -4,6 +4,7 @@ import { UserRoleName } from '../constants/roles';
 import { AuditAction, AuditModule } from '../models/auditLog.model';
 import { auditLogRepository } from '../repositories/auditLog.repository';
 import { getSubscriptionForOrg, SubscriptionState } from './subscription.service';
+import { AI_AGENT_HEADER, AI_AGENT_TOKEN } from '../ai/apiClient';
 
 interface AuditEntry {
   organizationId: Types.ObjectId | string;
@@ -59,7 +60,8 @@ export function auditCrud(
       action,
       module,
       recordId: record.id,
-      recordLabel: record.label,
+      // Changes the AI assistant made on the user's behalf (after their Confirm) say so.
+      recordLabel: req.get(AI_AGENT_HEADER) === AI_AGENT_TOKEN ? `${record.label} (via AI assistant)` : record.label,
     },
     req.subscription
   );

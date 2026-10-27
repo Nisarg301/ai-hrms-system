@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { server } from '../../test/setup';
 import { API_BASE_URL } from '../../services/api';
@@ -25,10 +26,12 @@ function mockLogs(rows: AuditLogRow[] = ROWS) {
   return queries;
 }
 
-function renderPage() {
+function renderPage(url = '/audit-logs') {
   render(
     <Provider store={makeTestStore()}>
-      <AuditLogsPage />
+      <MemoryRouter initialEntries={[url]}>
+        <AuditLogsPage />
+      </MemoryRouter>
     </Provider>
   );
 }
@@ -64,6 +67,19 @@ describe('AuditLogsPage', () => {
     await waitFor(() => expect(queries.at(-1)?.get('action')).toBe('delete'));
     expect(queries.at(-1)?.get('module')).toBe('documents');
     expect(queries.at(-1)?.get('page')).toBe('1');
+  });
+
+  it('reads its filters from the URL, as the AI assistant sets them', async () => {
+    const queries = mockLogs();
+    renderPage('/audit-logs?module=leave&action=create&from=2026-10-01&to=2026-10-21');
+    await waitFor(() => expect(queries.length).toBeGreaterThan(0));
+    // One request, with the URL's filters: the page never loads everything first.
+    expect(queries).toHaveLength(1);
+    expect(queries[0].get('module')).toBe('leave');
+    expect(queries[0].get('action')).toBe('create');
+    expect(queries[0].get('from')).toBeTruthy();
+    expect(queries[0].get('to')).toBeTruthy();
+    expect(await screen.findByTitle('Leave')).toBeInTheDocument();
   });
 
   it('shows an empty state when there is no activity', async () => {

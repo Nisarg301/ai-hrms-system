@@ -28,3 +28,20 @@ export const updateTaskSchema = z.object({
   status: z.enum(TASK_STATUSES).optional(),
   userId: memberIdsSchema.optional(),
 });
+
+/** GET /tasks filters, next to page/limit/search/sortBy/sortDir. */
+export const listTasksQuerySchema = z.object({
+  projectId: objectIdSchema.optional(),
+  /** One status, or several separated by commas: "todo,in-progress". */
+  status: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : undefined))
+    .pipe(z.array(z.enum(TASK_STATUSES)).min(1).optional()),
+  /** Due dates are YYYY-MM-DD strings, so a range compares as text. */
+  dueFrom: dueDateSchema.optional(),
+  dueTo: dueDateSchema.optional(),
+  /** Tasks that have this person among their members. */
+  memberId: objectIdSchema.optional(),
+});

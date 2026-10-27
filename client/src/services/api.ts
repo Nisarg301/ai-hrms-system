@@ -59,6 +59,25 @@ function refreshOnce(): Promise<string> {
   return refreshPromise;
 }
 
+/**
+ * For requests that can't go through axios (the AI chat streams over fetch): the same
+ * shared refresh, so a 401 there renews the token exactly like the interceptor does.
+ */
+export async function refreshAccessToken(): Promise<string> {
+  try {
+    return await refreshOnce();
+  } catch (err) {
+    setAccessToken(null);
+    onAuthFailure?.();
+    throw err;
+  }
+}
+
+/** Lets the AI chat stream report an expired plan the way the interceptor does. */
+export function notifyPlanExpired(): void {
+  onPlanExpired?.();
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {

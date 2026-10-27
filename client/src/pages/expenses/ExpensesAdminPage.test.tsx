@@ -213,6 +213,13 @@ describe('Expenses admin: claims', () => {
     expect(exportQueries).toEqual([{}]);
   });
 
+  it('reads its filters from the URL, as the AI assistant sets them, and exports their dates', async () => {
+    renderPage('/expenses?status=approved&employee=u7&category=c1&from=2026-10-01&to=2026-10-04');
+    await waitFor(() => expect(claimQueries.at(-1)).toMatchObject({ status: 'approved', employeeId: 'u7', categoryId: 'c1', from: '2026-10-01', to: '2026-10-04', page: '1' }));
+    await userEvent.click(screen.getByRole('button', { name: /Export CSV/ }));
+    await waitFor(() => expect(exportQueries.at(-1)).toEqual({ from: '2026-10-01', to: '2026-10-04' }));
+  });
+
   it('has no export on Basic', async () => {
     renderPage('/expenses', 'basic');
     await screen.findByText('Pune visit');
@@ -221,6 +228,11 @@ describe('Expenses admin: claims', () => {
 });
 
 describe('Expenses admin: summary', () => {
+  it('reads its dates from the URL, as the AI assistant sets them', async () => {
+    renderPage('/expenses?tab=summary&from=2026-09-01&to=2026-09-15');
+    await waitFor(() => expect(summaryQueries[0]).toEqual({ from: '2026-09-01', to: '2026-09-15' }));
+  });
+
   it('shows this month by default, with bars by category and department, and follows a preset', async () => {
     renderPage('/expenses?tab=summary');
     await waitFor(() => expect(screen.getByTestId('stat-approved')).toHaveTextContent('₹3,500.00'));

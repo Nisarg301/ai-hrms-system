@@ -1,7 +1,8 @@
 import { Alert, DatePicker, Select, Tag, Typography, theme } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DataTable } from '../../components/DataTable/DataTable';
 import { MODULE_LABELS } from '../../constants/modules';
 import { useAppDispatch, useAppSelector } from '../../hooks/store';
@@ -14,7 +15,7 @@ import {
 } from '../../store/auditLogs/auditLogsSelectors';
 import { filtersChanged, pageChanged } from '../../store/auditLogs/auditLogsSlice';
 import { fetchAuditLogs } from '../../store/auditLogs/auditLogsThunks';
-import { AUDIT_ACTIONS, type AuditAction, type AuditLogRow, type AuditModule } from '../../types/auditLog';
+import { AUDIT_ACTIONS, type AuditAction, type AuditLogFilters, type AuditLogRow, type AuditModule } from '../../types/auditLog';
 
 // Areas audited beyond the permission-matrix modules.
 const OTHER_MODULE_LABELS: Record<'roles' | 'holidays' | 'announcements' | 'leave' | 'posts' | 'attendance' | 'expenses' | 'onboarding' | 'performance', string> = {
@@ -31,6 +32,27 @@ const OTHER_MODULE_LABELS: Record<'roles' | 'holidays' | 'announcements' | 'leav
 
 // The modules that record create/update/delete.
 const AUDITED_MODULES: AuditModule[] = ['employees', 'documents', 'departments', 'projects', 'tasks', 'roles', 'leave', 'holidays', 'announcements', 'posts', 'attendance', 'expenses', 'onboarding', 'performance'];
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The filters live in the URL (?module=leave&action=create&from=2026-10-01&to=2026-10-21), so the
+ * AI assistant and bookmarks can set them. The days become whole days here, as the date picker sends them.
+ */
+function filtersFrom(params: URLSearchParams): AuditLogFilters {
+  const module = AUDITED_MODULES.find((m) => m === params.get('module'));
+  const action = AUDIT_ACTIONS.find((a) => a === params.get('action'));
+  const from = params.get('from');
+  const to = params.get('to');
+  return {
+    module,
+    action,
+    from: from && DAY.test(from) ? dayjs(from).startOf('day').toISOString() : undefined,
+    to: to && DAY.test(to) ? dayjs(to).endOf('day').toISOString() : undefined,
+  };
+}
+
+const sameFilters = (a: AuditLogFilters, b: AuditLogFilters) => a.module === b.module && a.action === b.action && a.from === b.from && a.to === b.to;
 
 function moduleLabel(module: AuditModule | null): string {
   if (module === null) return 'Sign-in';
@@ -68,20 +90,33 @@ export default function AuditLogsPage() {
   const error = useAppSelector(selectAuditLogsError);
   const filters = useAppSelector(selectAuditLogFilters);
   const { page, limit, total } = useAppSelector(selectAuditLogsPagination);
+  const [params, setParams] = useSearchParams();
+  const query = params.toString();
+  const wanted = useMemo(() => filtersFrom(new URLSearchParams(query)), [query]);
+  const synced = sameFilters(wanted, filters);
+
+  // The URL is the source: a new address (by hand, a bookmark, or the assistant) sets the store's filters.
+  useEffect(() => {
+    if (!synced) dispatch(filtersChanged(wanted));
+  }, [dispatch, synced, wanted]);
 
   useEffect(() => {
-    void dispatch(fetchAuditLogs());
-  }, [dispatch, page, limit, filters]);
+    if (synced) void dispatch(fetchAuditLogs());
+  }, [dispatch, page, limit, filters, synced]);
+
+  /** A filter changed on the page: written to the URL, which then sets the store. */
+  const setFilter = (next: { module?: AuditModule; action?: AuditAction; from?: string; to?: string }) => {
+    const url = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(next)) {
+      if (value) url.set(key, value);
+      else url.delete(key);
+    }
+    setParams(url, { replace: true });
+  };
 
   const onRangeChange = (range: [Dayjs | null, Dayjs | null] | null) => {
     const [start, end] = range ?? [null, null];
-    dispatch(
-      filtersChanged({
-        ...filters,
-        from: start ? start.startOf('day').toISOString() : undefined,
-        to: end ? end.endOf('day').toISOString() : undefined,
-      })
-    );
+    setFilter({ from: start ? start.format('YYYY-MM-DD') : undefined, to: end ? end.format('YYYY-MM-DD') : undefined });
   };
 
   const columns: ColumnsType<AuditLogRow> = [
@@ -128,7 +163,7 @@ export default function AuditLogsPage() {
             placeholder="All modules"
             style={{ minWidth: 160 }}
             value={filters.module}
-            onChange={(module) => dispatch(filtersChanged({ ...filters, module }))}
+            onChange={(module) => setFilter({ module })}
             options={AUDITED_MODULES.map((m) => ({ value: m, label: moduleLabel(m) }))}
           />
           <Select<AuditAction>
@@ -137,7 +172,7 @@ export default function AuditLogsPage() {
             placeholder="All actions"
             style={{ minWidth: 140 }}
             value={filters.action}
-            onChange={(action) => dispatch(filtersChanged({ ...filters, action }))}
+            onChange={(action) => setFilter({ action })}
             options={AUDIT_ACTIONS.map((a) => ({ value: a, label: ACTION_LABELS[a] }))}
           />
           <DatePicker.RangePicker

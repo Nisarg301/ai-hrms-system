@@ -67,8 +67,7 @@ describe('AttendanceRequestDrawer', () => {
 
     await type('Clock in', '09:30');
     await type('Clock out', '18:30');
-    expect(send).toBeDisabled(); // still needs a reason
-    await userEvent.type(screen.getByLabelText('Reason'), 'Forgot to clock out');
+    await userEvent.type(screen.getByLabelText('Reason (optional)'), 'Forgot to clock out');
     await userEvent.click(send);
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
@@ -80,7 +79,7 @@ describe('AttendanceRequestDrawer', () => {
     await type('Clock in', '18:00');
     await type('Clock out', '09:00');
     expect(screen.getByText('Clock-out must be after clock-in.')).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText('Reason'), 'x');
+    await userEvent.type(screen.getByLabelText('Reason (optional)'), 'x');
     expect(screen.getByRole('button', { name: 'Send request' })).toBeDisabled();
 
     await type('Clock out', '19:00');
@@ -93,7 +92,7 @@ describe('AttendanceRequestDrawer', () => {
     await type('Date', '2026-10-06');
     await type('Clock in', '09:30');
     await type('Clock out', '18:30');
-    await userEvent.type(screen.getByLabelText('Reason'), 'x');
+    await userEvent.type(screen.getByLabelText('Reason (optional)'), 'x');
     expect(screen.getByRole('button', { name: 'Send request' })).toBeDisabled();
   });
 
@@ -103,7 +102,7 @@ describe('AttendanceRequestDrawer', () => {
     await type('From', '2026-10-07');
     expect(screen.getByLabelText('To')).toHaveValue('07 Oct 2026'); // pulled along
     await type('To', '2026-10-08');
-    await userEvent.type(screen.getByLabelText('Reason'), 'Plumber visit');
+    await userEvent.type(screen.getByLabelText('Reason (optional)'), 'Plumber visit');
     await userEvent.click(screen.getByRole('button', { name: 'Send request' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(sent[0].body).toEqual({ kind: 'wfh', startDate: '2026-10-07', endDate: '2026-10-08', reason: 'Plumber visit' });

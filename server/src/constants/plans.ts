@@ -30,7 +30,7 @@ export const PLANS: Record<PlanType, PlanDefinition> = {
     professional: {
         type: 'professional',
         name: 'Professional',
-        description: 'Everything in Basic, plus CSV exports and audit logs.',
+        description: 'Everything in Basic, plus CSV exports, audit logs and the AI assistant.',
         modules: PLAN_MODULES.professional,
         prices: { monthly: 60000, quarterly: 180000, yearly: 720000 },
     },

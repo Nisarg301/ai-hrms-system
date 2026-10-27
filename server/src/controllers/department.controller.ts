@@ -8,6 +8,7 @@ import { successResponse, ApiError } from '../utils/apiResponse';
 import { parsePaginationQuery } from '../utils/pagination';
 import { IDepartmentRecord } from '../models/department.model';
 import { containsPattern } from '../utils/regex';
+import { listDepartmentsQuerySchema } from '../validators/department.validators';
 
 function serialize(d: IDepartmentRecord) {
     return {
@@ -38,6 +39,12 @@ export const listDepartments = asyncHandler(async (req: Request, res: Response) 
     if (search) {
         filter.$or = [{ title: containsPattern(search) }, { description: containsPattern(search) }];
     }
+    // Optional filter (the AI assistant lists "inactive departments" with it).
+    const filters = listDepartmentsQuerySchema.safeParse(req.query);
+    if (!filters.success) {
+        throw new ApiError(400, 'Validation failed', filters.error.flatten());
+    }
+    if (filters.data.status) filter.status = filters.data.status;
     const { items, total } = await departmentRepository.paginate({ filter, skip, limit, sortBy, sortDir });
     res.status(200).json(successResponse(items.map(serialize), { page, limit, total }));
 });

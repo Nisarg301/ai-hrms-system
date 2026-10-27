@@ -2,7 +2,8 @@ import { DownloadOutlined, WalletOutlined } from '@ant-design/icons';
 import { Alert, Button, DatePicker, message, Select, Space, Table, Tag, theme, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ExpenseReviewDrawer } from '../../components/ExpenseReviewDrawer/ExpenseReviewDrawer';
 import { PersonAvatar } from '../../components/PersonAvatar/PersonAvatar';
 import { EmptyState } from '../../components/EmptyState/EmptyState';
@@ -23,7 +24,19 @@ import { PayClaimsModal } from './PayClaimsModal';
 
 const PAGE_SIZE = 20;
 const MAX_PAY = 100;
-const STATUS_OPTIONS = (['submitted', 'approved', 'rejected', 'paid'] as const).map((s) => ({ value: s, label: CLAIM_STATUS_META[s].label }));
+const STATUSES = ['submitted', 'approved', 'rejected', 'paid'] as const;
+const STATUS_OPTIONS = STATUSES.map((s) => ({ value: s, label: CLAIM_STATUS_META[s].label }));
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The filters live in the URL (?status=approved&employee=…&from=…&to=…), so the AI assistant and bookmarks can set them. */
+function filtersFrom(params: URLSearchParams): AdminClaimFilters {
+  const status = STATUSES.find((s) => s === params.get('status'));
+  const day = (key: string) => {
+    const v = params.get(key);
+    return v && DAY.test(v) ? v : undefined;
+  };
+  return { status, employeeId: params.get('employee') ?? undefined, categoryId: params.get('category') ?? undefined, from: day('from'), to: day('to') };
+}
 
 /** Everyone's claims (not drafts): filters, the review drawer, and paying approved claims in bulk. */
 export function ClaimsTab() {
@@ -32,7 +45,9 @@ export function ClaimsTab() {
   const can = useCan();
   const { claims, claimsTotal, claimsStatus, claimsError, categories } = useAppSelector(selectExpensesAdmin);
   const people = useAppSelector(selectPeople);
-  const [filters, setFilters] = useState<AdminClaimFilters>({});
+  const [params, setParams] = useSearchParams();
+  const query = params.toString();
+  const filters = useMemo(() => filtersFrom(new URLSearchParams(query)), [query]);
   const [page, setPage] = useState(1);
   /** Ticked approved claims, kept across pages so the total stays right. */
   const [selected, setSelected] = useState<Record<string, AdminExpenseClaim>>({});
@@ -54,9 +69,22 @@ export function ClaimsTab() {
     };
   }, [dispatch]);
 
+  // New filters, by hand or from the assistant, start again on the first page.
+  useEffect(() => setPage(1), [query]);
+
   const setFilter = (next: AdminClaimFilters) => {
-    setFilters(next);
-    setPage(1);
+    const url = new URLSearchParams();
+    const tab = params.get('tab');
+    if (tab) url.set('tab', tab);
+    const entries: [string, string | undefined][] = [
+      ['status', next.status],
+      ['employee', next.employeeId],
+      ['category', next.categoryId],
+      ['from', next.from],
+      ['to', next.to],
+    ];
+    for (const [key, value] of entries) if (value) url.set(key, value);
+    setParams(url, { replace: true });
   };
 
   const refresh = () => {

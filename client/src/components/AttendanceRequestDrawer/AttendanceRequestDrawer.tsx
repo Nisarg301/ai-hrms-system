@@ -94,7 +94,7 @@ export function AttendanceRequestDrawer({
   const ready =
     Boolean(date) &&
     (isFix ? timesOk : Boolean(endDate) && endDate! >= date!) &&
-    (mode === "record" ? Boolean(employeeId) : reason.trim().length > 0);
+    (mode !== "record" || Boolean(employeeId));
 
   const onSubmit = async () => {
     if (!ready || !date) return;
@@ -287,7 +287,7 @@ export function AttendanceRequestDrawer({
         )}
 
         <Form.Item
-          label={mode === "record" ? "Reason (optional)" : "Reason"}
+          label="Reason (optional)"
           htmlFor="att-reason"
         >
           <Input.TextArea

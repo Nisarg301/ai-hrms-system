@@ -1,7 +1,7 @@
 import { SendOutlined, TrophyOutlined } from '@ant-design/icons';
-import { Button, Card, Input, message } from 'antd';
+import { Button, Card, Input, Typography, message } from 'antd';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useId, useState, type RefObject } from 'react';
 import { PersonAvatar } from '../../../components/PersonAvatar/PersonAvatar';
 import { createPost } from '../../../store/posts/postsThunks';
 import { selectAuthUser } from '../../../store/auth/authSelectors';
@@ -25,6 +25,7 @@ export function PostComposer({ name, avatarUrl, inputRef, prefill }: PostCompose
   const [posting, setPosting] = useState(false);
   const [praising, setPraising] = useState(false);
   const me = useAppSelector(selectAuthUser);
+  const countId = useId();
 
   useEffect(() => {
     if (!prefill) return;
@@ -55,23 +56,29 @@ export function PostComposer({ name, avatarUrl, inputRef, prefill }: PostCompose
           <Input.TextArea
             ref={inputRef}
             aria-label="Write a post"
+            aria-describedby={countId}
             placeholder="Share an update, a win or a thank-you with everyone…"
             autoSize={{ minRows: 2, maxRows: 8 }}
             maxLength={POST_MAX}
-            showCount
             value={body}
             onChange={(e) => setBody(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void onPost();
             }}
           />
-          <div className="mt-3 flex justify-end gap-2">
-            <Button icon={<TrophyOutlined />} onClick={() => setPraising(true)}>
-              Praise
-            </Button>
-            <Button type="primary" icon={<SendOutlined />} disabled={!trimmed} loading={posting} onClick={onPost}>
-              Post
-            </Button>
+          {/* The count sits in the action row: antd's showCount hangs below the box and ran into the buttons. */}
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <Typography.Text id={countId} type={body.length >= POST_MAX * 0.9 ? 'warning' : 'secondary'} className="text-xs tabular-nums">
+              {body.length} / {POST_MAX}
+            </Typography.Text>
+            <div className="flex gap-2">
+              <Button icon={<TrophyOutlined />} onClick={() => setPraising(true)}>
+                Praise
+              </Button>
+              <Button type="primary" icon={<SendOutlined />} disabled={!trimmed} loading={posting} onClick={onPost}>
+                Post
+              </Button>
+            </div>
           </div>
         </div>
       </div>

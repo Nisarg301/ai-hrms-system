@@ -1,0 +1,6 @@
+{
+  // Tests only: isolatedModules makes ts-jest transpile without type-checking (tsc does that).
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "isolatedModules": true },
+  "include": ["src", "tests"]
+}

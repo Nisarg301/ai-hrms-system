@@ -20,6 +20,7 @@ Modules: employees, departments, documents, projects, tasks, dashboard, attendan
   - Cloud: a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster (copy its `mongodb+srv://` connection string)
 - Optional: **Razorpay test keys**, needed to activate a plan for an organization (see [Plans and payments](#plans-and-payments))
 - Optional: **SMTP credentials**. Without them, emails go to a throwaway Ethereal inbox in development
+- Optional: **Ollama**, for the AI chat assistant (Professional plan). Steps for macOS, Windows and Linux are in [AI assistant (Ollama)](#ai-assistant-ollama). The rest of the app works without it
 
 ---
 
@@ -68,6 +69,10 @@ npm run dev
 
 Open **http://localhost:5173** and log in with the `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` you set.
 
+### 3. AI assistant (optional)
+
+To use the chat assistant, install Ollama and download a model first: see [AI assistant (Ollama)](#ai-assistant-ollama). Then set `AI_ENABLED=true` in `server/.env` and restart the server.
+
 ---
 
 ## First run walkthrough
@@ -100,6 +105,10 @@ See [`server/.env.example`](server/.env.example) for the full template with comm
 | `RAZOR_PAY_API_KEY` / `RAZOR_PAY_SECRET` | for payments | | Razorpay key id and secret. Payment endpoints return 503 without them |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | no | | Outgoing mail. Empty `SMTP_HOST` in development uses Ethereal |
 | `MAIL_FROM` | no | `Sentinel <no-reply@sentinel.local>` | Sender on outgoing email |
+| `AI_ENABLED` | no | `false` | Turns on the AI chat assistant. Needs Ollama (see [AI assistant (Ollama)](#ai-assistant-ollama)) |
+| `OLLAMA_HOST` | no | `http://localhost:11434` | Where Ollama listens |
+| `OLLAMA_MODEL` | no | `qwen2.5:3b` | The model to use. `llama3.2` is recommended: the assistants' test phrases were run on it |
+| `AI_MAX_CONCURRENT`, `AI_REQUEST_TIMEOUT_MS`, `AI_NUM_CTX`, … | no | see `.env.example` | Tuning. The defaults suit a machine without a GPU |
 
 ### `client/.env`
 
@@ -141,6 +150,166 @@ Emails (temporary passwords, password reset, plan expiry, onboarding and perform
 - **Mailtrap or another provider:** paste its SMTP host, port, user and password. Port 465 uses TLS; any other port uses STARTTLS.
 
 No emails are sent while running tests.
+
+---
+
+## AI assistant (Ollama)
+
+Most pages have a chat assistant: you type or speak a request ("Create a project called Apollo due 31 December", "Apply for leave from 3 Nov to 5 Nov"), and it answers or prepares the change for you to confirm. It runs on a **local AI model through [Ollama](https://ollama.com)**, so HR data never leaves your machine.
+
+- It is on the **Professional** plan only, and off until you set `AI_ENABLED=true`.
+- The rest of the app works the same without it.
+- How it works, page by page, is in [`docs/AI_ASSISTANT_PLAN.md`](docs/AI_ASSISTANT_PLAN.md).
+
+### What your computer needs
+
+| | Minimum | Better |
+| --- | --- | --- |
+| RAM | 8 GB (the model takes about 2.5 GB while loaded) | 16 GB |
+| Disk | About 2 GB free per model | |
+| CPU | Any 64-bit CPU | 4 cores or more |
+| GPU | Not needed | Used by itself when present: Apple Silicon Macs, NVIDIA cards with current drivers, supported AMD cards |
+
+Without a GPU, a reply takes about 5–15 seconds, and the first one after a restart up to about 40 seconds while the model loads. On an Apple Silicon Mac or with a GPU, a few seconds.
+
+### Step 1: install Ollama
+
+Install it on the same system the server runs on, so the server can reach it at `localhost:11434`.
+
+#### macOS
+
+- **Recommended: the app.**
+  1. Download it from [ollama.com/download/mac](https://ollama.com/download/mac). The page lists the minimum macOS version.
+  2. Open the `.zip`, and drag **Ollama** into **Applications**.
+  3. Open it once. It runs in the menu bar, adds the `ollama` command, and starts again when you log in.
+- **Or with Homebrew:**
+  ```bash
+  brew install ollama
+  brew services start ollama      # starts it now and at every login
+  ```
+
+#### Windows
+
+- **Recommended: the installer.**
+  1. Download `OllamaSetup.exe` from [ollama.com/download/windows](https://ollama.com/download/windows), and run it. It needs Windows 10 or 11 (64-bit), and installs for your user without admin rights.
+  2. Ollama then runs in the background (an icon in the system tray), and starts with Windows.
+  3. Open a **new** PowerShell window, so the `ollama` command is found.
+- **Or with winget:**
+  ```powershell
+  winget install Ollama.Ollama
+  ```
+- **If you run the server inside WSL**, install the Linux version inside WSL instead (next section), so `localhost:11434` is the same machine for both.
+
+#### Linux
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+This installs the `ollama` command and a `systemd` service that starts at boot. To read the script before running it, download it first with `curl -fsSL https://ollama.com/install.sh -o install.sh`.
+
+On a system without `systemd` (some containers, or WSL with it turned off), run `ollama serve` in its own terminal and leave it open.
+
+#### Any system: Docker
+
+```bash
+docker run -d --name ollama -p 11434:11434 -v ollama:/root/.ollama ollama/ollama
+```
+
+- With an NVIDIA GPU on Linux, add `--gpus=all`. That needs the NVIDIA Container Toolkit.
+- On a Mac, Docker can't use the Apple GPU, so the app above is much faster there.
+
+### Step 2: check that it's running
+
+```bash
+ollama --version
+curl http://localhost:11434/api/version     # expect {"version":"..."}
+```
+
+On Windows PowerShell, type `curl.exe` instead of `curl`.
+
+If it isn't running:
+
+| System | Start it with |
+| --- | --- |
+| macOS | Open the Ollama app, or `brew services start ollama` |
+| Windows | Open **Ollama** from the Start menu |
+| Linux | `sudo systemctl start ollama`; check with `systemctl status ollama` |
+| Docker | `docker start ollama` |
+| Anywhere | `ollama serve` in a terminal you leave open |
+
+### Step 3: download the model
+
+```bash
+ollama pull llama3.2      # 2.0 GB, once
+ollama list               # llama3.2 should be listed
+ollama run llama3.2 "Reply with one short line: hello"
+```
+
+With Docker, prefix each command with `docker exec -it ollama`, for example `docker exec -it ollama ollama pull llama3.2`.
+
+| Model | When |
+| --- | --- |
+| `llama3.2` (3B) | **Recommended.** Every assistant's test phrases in `docs/` were run on it |
+| `qwen2.5:3b` (3B) | The server's default when `OLLAMA_MODEL` isn't set; also works |
+| 7B models | More accurate, but need about 8 GB of free RAM, and are much slower without a GPU |
+
+### Step 4 (recommended without a GPU): keep the model loaded
+
+By default, Ollama unloads the model after 5 idle minutes, and loading it again takes seconds. These settings keep it loaded for 30 minutes, with one request at a time:
+
+| Setting | Value |
+| --- | --- |
+| `OLLAMA_KEEP_ALIVE` | `30m` |
+| `OLLAMA_NUM_PARALLEL` | `1` |
+| `OLLAMA_MAX_LOADED_MODELS` | `1` |
+
+How to set them:
+
+- **Linux:** run `sudo systemctl edit ollama`, add these lines, and save:
+  ```ini
+  [Service]
+  Environment="OLLAMA_KEEP_ALIVE=30m"
+  Environment="OLLAMA_NUM_PARALLEL=1"
+  Environment="OLLAMA_MAX_LOADED_MODELS=1"
+  ```
+  Then run `sudo systemctl daemon-reload && sudo systemctl restart ollama`.
+- **macOS:** run these, then quit Ollama from the menu bar and open it again:
+  ```bash
+  launchctl setenv OLLAMA_KEEP_ALIVE 30m
+  launchctl setenv OLLAMA_NUM_PARALLEL 1
+  launchctl setenv OLLAMA_MAX_LOADED_MODELS 1
+  ```
+- **Windows:** quit Ollama from the system tray. Run these in PowerShell, then open Ollama again:
+  ```powershell
+  setx OLLAMA_KEEP_ALIVE 30m
+  setx OLLAMA_NUM_PARALLEL 1
+  setx OLLAMA_MAX_LOADED_MODELS 1
+  ```
+- **Docker:** add `-e OLLAMA_KEEP_ALIVE=30m -e OLLAMA_NUM_PARALLEL=1 -e OLLAMA_MAX_LOADED_MODELS=1` to `docker run`.
+
+### Step 5: turn it on in the app
+
+1. Add these lines to `server/.env`:
+   ```env
+   AI_ENABLED=true
+   OLLAMA_HOST=http://localhost:11434
+   OLLAMA_MODEL=llama3.2
+   ```
+2. Restart the server (`npm run dev`). It logs `AI ready: llama3.2 at http://localhost:11434`. If Ollama isn't reachable or the model is missing, it logs a warning instead, and the chat says the assistant is offline.
+3. Log in as a member of an organization on the **Professional** plan, and open a page with an assistant: Employees, Projects, Departments, Tasks, Documents, Exports, Roles, Expenses, Audit Logs, or the Me page's Leave, Attendance and Expenses tabs.
+4. Click the round button in the bottom-right corner. Type, or click the mic and speak. The mic works in Chrome, Edge and Safari, on `localhost` or `https://`.
+
+### Testing the assistant against the model
+
+Each assistant has an eval: about 15–20 real phrases, run against your local model.
+
+```bash
+cd server
+RUN_OLLAMA=1 OLLAMA_MODEL=llama3.2 npx jest tests/ai/project.eval --runInBand
+```
+
+Swap `project` for another module: `employee`, `department`, `exports`, `task`, `document`, `role`, `expense`, `me` or `auditLog`. Run one at a time: each loads the model, and several at once can run out of memory. Ordinary `npm test` never calls Ollama.
 
 ---
 
@@ -252,9 +421,13 @@ An Org Admin's role grants `read` / `create` / `update` / `delete` per module. `
 │   │   ├── middlewares/    authenticate, authorize, validate, rate limit, upload, errors
 │   │   ├── validators/     Zod request schemas
 │   │   ├── jobs/           daily cron reminders
+│   │   ├── ai/             the AI assistant: agent, Ollama client, one module per page
 │   │   └── scripts/        seedSuperAdmin
-│   └── tests/              Jest + Supertest integration tests
+│   └── tests/              Jest + Supertest integration tests (tests/ai: the assistant)
+└── docs/                   the AI assistant's design, one document per page
 ```
+
+The assistant's chat drawer is in `client/src/components/AiAssistant/`. How a typed or spoken message travels through the files is in [`docs/AI_ASSISTANT_PLAN.md`](docs/AI_ASSISTANT_PLAN.md), section 13.
 
 Request flow on the server: `Route → Controller → Service → Repository → MongoDB`.
 
@@ -272,3 +445,10 @@ Request flow on the server: `Route → Controller → Service → Repository →
 | No emails arrive | With `SMTP_HOST` empty, look for the Ethereal preview link in the server console. For Gmail, use an App Password, not your normal password |
 | Port 4000 or 5173 already in use | Change `PORT` in `server/.env` (and update `VITE_API_BASE_URL`), or run the client with `npm run dev -- --port 5174` (and update `CORS_ORIGIN`) |
 | `bcrypt` fails to install | It compiles a native module. Use Node 20+ LTS; on Linux install `build-essential` and `python3`, on Windows the Visual Studio Build Tools |
+| `ollama: command not found` right after installing | Open a new terminal (on Windows, a new PowerShell window), so it picks up the new `PATH` |
+| Server logs `connect ECONNREFUSED 127.0.0.1:11434` | Ollama isn't running: see [Step 2](#step-2-check-that-its-running) for each system |
+| Server logs that the model isn't found | Run `ollama pull llama3.2`, or set `OLLAMA_MODEL` to a name from `ollama list` |
+| No assistant button | The organization is on Basic, `AI_ENABLED` isn't `true`, the page has no assistant, or your role can't read that page |
+| No mic button, or the mic won't start | Firefox has no speech recognition: use Chrome, Edge or Safari. Browsers allow the mic only on `localhost` or `https://` |
+| Replies are very slow, or the computer freezes | Not enough free RAM, so the model is swapping. Close other apps, keep to a 3B model, and check with `ollama ps` |
+| Ollama runs on Windows but the server in WSL can't reach it | Install the Linux version inside WSL instead, or point `OLLAMA_HOST` at the Windows host's address |

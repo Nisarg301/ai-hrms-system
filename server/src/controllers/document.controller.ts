@@ -7,7 +7,8 @@ import { successResponse, ApiError } from '../utils/apiResponse';
 import { parsePaginationQuery } from '../utils/pagination';
 import { IDocumentRecord } from '../models/document.model';
 import { uploadFile, deleteFile, downloadFile } from '../services/gridfs.service';
-import { containsPattern } from '../utils/regex';
+import { containsPattern, escapeRegex } from '../utils/regex';
+import { listDocumentsQuerySchema } from '../validators/document.validators';
 
 function serialize(d: IDocumentRecord) {
   return {
@@ -67,6 +68,13 @@ export const listDocuments = asyncHandler(async (req: Request, res: Response) =>
   if (search) {
     filter.$or = [{ title: containsPattern(search) }, { category: containsPattern(search) }];
   }
+  // Optional filters (the AI assistant lists "HR documents" or "archived documents" with these).
+  const filters = listDocumentsQuerySchema.safeParse(req.query);
+  if (!filters.success) {
+    throw new ApiError(400, 'Validation failed', filters.error.flatten());
+  }
+  if (filters.data.category) filter.category = new RegExp(`^${escapeRegex(filters.data.category)}$`, 'i');
+  if (filters.data.status) filter.status = filters.data.status;
   const { items, total } = await documentRepository.paginate({ filter, skip, limit, sortBy, sortDir });
   res.status(200).json(successResponse(items.map(serialize), { page, limit, total }));
 });

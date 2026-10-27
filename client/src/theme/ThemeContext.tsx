@@ -145,3 +145,12 @@ export function useTheme(): ThemeContextValue {
   }
   return context;
 }
+
+/**
+ * The current theme's tokens, or the default light theme's outside a ThemeProvider (a
+ * component rendered on its own, as in most tests). For small shared pieces such as avatars.
+ */
+export function useThemeTokens(): Pick<ThemeContextValue, 'tokens' | 'isDarkMode'> {
+  const context = useContext(ThemeContext);
+  return context ?? { tokens: getThemeTokens(false), isDarkMode: false };
+}

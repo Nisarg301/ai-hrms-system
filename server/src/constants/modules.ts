@@ -17,6 +17,6 @@ export const PLAN_MODULES: Record<PlanType, readonly ModuleName[]> = {
 // Keep in sync with frontend/src/constants/modules.ts.
 export const PLAN_FEATURES = {
     basic: ['expenses', 'onboarding'],
-    professional: ['expenses', 'onboarding', 'performance'],
+    professional: ['expenses', 'onboarding', 'performance', 'ai'],
 } as const satisfies Record<PlanType, readonly string[]>;
 export type PlanFeature = (typeof PLAN_FEATURES)['professional'][number];

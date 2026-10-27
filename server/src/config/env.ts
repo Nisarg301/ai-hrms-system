@@ -5,6 +5,8 @@ dotenv.config();
 
 // An empty `KEY=` line (as copied from .env.example) means "not set", not "invalid".
 const optionalString = z.preprocess((value) => (value === '' ? undefined : value), z.string().min(1).optional());
+// z.coerce.boolean() would read the string "false" as true, so flags are parsed explicitly.
+const flag = (fallback: boolean) => z.preprocess((value) => (value === undefined || value === '' ? fallback : value === 'true'), z.boolean());
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -31,6 +33,20 @@ const envSchema = z.object({
   SUPERADMIN_EMAIL: z.string().email().optional(),
   SUPERADMIN_PASSWORD: z.string().min(8).optional(),
   SUPERADMIN_NAME: z.string().min(1).optional(),
+  // AI assistant (local Ollama, see docs/AI_ASSISTANT_PLAN.md). Off by default, so tests
+  // and machines without Ollama boot normally; the /ai routes answer 503 while it's off.
+  AI_ENABLED: flag(false),
+  OLLAMA_HOST: z.string().default('http://localhost:11434'),
+  OLLAMA_MODEL: z.string().default('qwen2.5:3b'),
+  // Where tools send their internal API calls. Unset -> http://127.0.0.1:${PORT}/api/v1.
+  AI_INTERNAL_API_BASE: optionalString,
+  AI_MAX_TOOL_STEPS: z.coerce.number().int().min(1).default(4),
+  AI_MAX_CONCURRENT: z.coerce.number().int().min(1).default(1),
+  AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(180_000),
+  AI_NUM_CTX: z.coerce.number().int().positive().default(4096),
+  // Read tools answer with their formatted table, without a second model call.
+  AI_FAST_READS: flag(true),
+  AI_HISTORY_DAYS: z.coerce.number().int().min(1).default(30),
 });
 
 export const env = envSchema.parse(process.env);

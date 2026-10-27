@@ -14,3 +14,10 @@ export const updateDocumentSchema = z.object({
   category: z.string().trim().min(1).optional(),
   status: z.enum(DOCUMENT_STATUSES).optional(),
 });
+
+/** GET /documents filters, next to page/limit/search/sortBy/sortDir. */
+export const listDocumentsQuerySchema = z.object({
+  /** One category, matched whole and without regard to case. */
+  category: z.string().trim().min(1).max(100).optional(),
+  status: z.enum(DOCUMENT_STATUSES).optional(),
+});

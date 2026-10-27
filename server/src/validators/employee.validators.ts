@@ -18,6 +18,14 @@ export const createEmployeeSchema = z.object({
   onboarding: onboardingOptionsSchema.optional(),
 });
 
+/** GET /employees filters, next to page/limit/search/sortBy/sortDir. */
+export const listEmployeesQuerySchema = z.object({
+  department: objectIdSchema.optional(),
+  status: z.enum(USER_STATUSES).optional(),
+  /** The employees who have this role (the AI assistant counts them before deleting a role). */
+  roleId: objectIdSchema.optional(),
+});
+
 export const updateEmployeeSchema = z.object({
   name: z.string().trim().min(1).optional(),
   email: z.string().trim().min(1).email().optional(),

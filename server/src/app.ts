@@ -24,7 +24,8 @@ app.use(
         exposedHeaders: ['Content-Disposition'],
     })
 );
-app.use(compression());
+// The AI chat streams server-sent events; compressing would hold them back until the end.
+app.use(compression({ filter: (req, res) => !String(res.getHeader('Content-Type') ?? '').includes('text/event-stream') && compression.filter(req, res) }));
 if (env.NODE_ENV !== 'test') {
     app.use(morgan('dev'));
 }

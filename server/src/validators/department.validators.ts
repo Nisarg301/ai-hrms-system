@@ -12,3 +12,8 @@ export const updateDepartmentSchema = z.object({
     description: z.string().trim().min(1).optional(),
     status: z.enum(DEPARTMENT_STATUSES).optional(),
 });
+
+/** GET /departments filters, next to page/limit/search/sortBy/sortDir. */
+export const listDepartmentsQuerySchema = z.object({
+    status: z.enum(DEPARTMENT_STATUSES).optional(),
+});

@@ -1,6 +1,7 @@
 import { Alert, Card, Col, DatePicker, Row, Skeleton, Statistic, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { EmptyNote } from '../home/components/HomeCard';
 import { useAppDispatch, useAppSelector } from '../../hooks/store';
 import { selectExpensesAdmin } from '../../store/expensesAdmin/expensesAdminSelectors';
@@ -11,6 +12,7 @@ import { formatInrExact } from '../../utils/formatInr';
 type Range = { from: string; to: string };
 
 const iso = (d: Dayjs) => d.format('YYYY-MM-DD');
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 function thisMonth(): Range {
   return { from: iso(dayjs().startOf('month')), to: iso(dayjs()) };
@@ -53,11 +55,16 @@ export function SummaryTab() {
   const dispatch = useAppDispatch();
   const { token } = theme.useToken();
   const { summary, summaryStatus, summaryError } = useAppSelector(selectExpensesAdmin);
-  const [range, setRange] = useState<Range>(thisMonth);
+  // The range lives in the URL (?tab=summary&from=…&to=…), so the AI assistant and bookmarks can set it.
+  const [params, setParams] = useSearchParams();
+  const from = params.get('from');
+  const to = params.get('to');
+  const range: Range = from && to && DAY.test(from) && DAY.test(to) && from <= to ? { from, to } : thisMonth();
+  const setRange = (next: Range) => setParams({ tab: 'summary', from: next.from, to: next.to }, { replace: true });
 
   useEffect(() => {
-    void dispatch(fetchExpenseSummary(range));
-  }, [dispatch, range]);
+    void dispatch(fetchExpenseSummary({ from: range.from, to: range.to }));
+  }, [dispatch, range.from, range.to]);
 
   const presets: { label: string; value: [Dayjs, Dayjs] }[] = [
     { label: 'This month', value: [dayjs().startOf('month'), dayjs()] },

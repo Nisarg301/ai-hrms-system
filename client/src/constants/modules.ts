@@ -30,6 +30,6 @@ export const PLAN_MODULES: Record<(typeof PLAN_TYPES)[number], readonly (typeof 
 // uses it (like Home and Me), so the plan alone decides. Mirrors backend PLAN_FEATURES.
 export const PLAN_FEATURES = {
   basic: ['expenses', 'onboarding'],
-  professional: ['expenses', 'onboarding', 'performance'],
+  professional: ['expenses', 'onboarding', 'performance', 'ai'],
 } as const satisfies Record<(typeof PLAN_TYPES)[number], readonly string[]>;
 export type PlanFeature = (typeof PLAN_FEATURES)['professional'][number];

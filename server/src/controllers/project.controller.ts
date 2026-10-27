@@ -7,6 +7,8 @@ import { successResponse, ApiError } from '../utils/apiResponse';
 import { parsePaginationQuery } from '../utils/pagination';
 import { IProjectRecord } from '../models/project.model';
 import { containsPattern } from '../utils/regex';
+import { addDays, zonedInstant } from '../utils/dates';
+import { listProjectsQuerySchema } from '../validators/project.validators';
 
 function serialize(p: IProjectRecord) {
   return {
@@ -38,6 +40,20 @@ export const listProjects = asyncHandler(async (req: Request, res: Response) => 
   const filter: QueryFilter<IProjectRecord> = { organizationId: req.orgFilter!.organizationId };
   if (search) {
     filter.name = containsPattern(search);
+  }
+  // Optional filters (the AI assistant asks for "overdue" or "on hold" projects with these).
+  const filters = listProjectsQuerySchema.safeParse(req.query);
+  if (!filters.success) {
+    throw new ApiError(400, 'Validation failed', filters.error.flatten());
+  }
+  const { status, dueFrom, dueTo } = filters.data;
+  if (status) filter.status = { $in: status };
+  if (dueFrom || dueTo) {
+    // A deadline is an instant; the range covers whole days in APP_TIMEZONE.
+    filter.deadline = {
+      ...(dueFrom ? { $gte: zonedInstant(dueFrom, '00:00') } : {}),
+      ...(dueTo ? { $lt: zonedInstant(addDays(dueTo, 1), '00:00') } : {}),
+    };
   }
   const { items, total } = await projectRepository.paginate({ filter, skip, limit, sortBy, sortDir });
   res.status(200).json(successResponse(items.map(serialize), { page, limit, total }));

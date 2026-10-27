@@ -12,13 +12,13 @@ import {
 import {
     CameraOutlined,
     SaveOutlined,
-    UserOutlined,
 } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { useAppDispatch, useAppSelector } from '../../hooks/store';
+import { avatarColors, initialOf } from '../../components/PersonAvatar/PersonAvatar';
 import { useTheme } from '../../hooks/useTheme';
 import { selectAuthUser } from '../../store/auth/authSelectors';
 import { updateProfile } from '../../store/auth/authThunks';
@@ -35,13 +35,14 @@ const { Text, Title } = Typography;
 export default function ProfilePage() {
     const user = useAppSelector(selectAuthUser);
     const dispatch = useAppDispatch();
-    const { tokens } = useTheme();
+    const { tokens, isDarkMode } = useTheme();
 
     const [serverError, setServerError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-    const initial = user?.name?.charAt(0).toUpperCase() || '?';
+    // The same letter and colours as the user's avatar everywhere else (PersonAvatar).
+    const initial = user?.name ? initialOf(user.name) : '?';
 
     const EMPTY: UpdateProfileFormValues = {
         name: user?.name || '',
@@ -187,9 +188,8 @@ export default function ProfilePage() {
                         <Avatar
                             size={88}
                             src={displayAvatarUrl}
-                            icon={!displayAvatarUrl ? <UserOutlined /> : undefined}
                             style={{
-                                backgroundColor: tokens.colorPrimary,
+                                ...avatarColors(tokens, isDarkMode),
                                 flexShrink: 0,
                             }}
                         >

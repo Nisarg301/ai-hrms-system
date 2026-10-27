@@ -29,6 +29,7 @@ import reviewRoutes from './review.routes';
 import reviewCycleRoutes from './reviewCycle.routes';
 import lifecycleRoutes from './lifecycle.routes';
 import expenseRoutes from './expense.routes';
+import aiRoutes from './ai.routes';
 const router = Router();
 
 router.use('/auth', authRoutes);
@@ -61,5 +62,6 @@ router.use('/lifecycle', lifecycleRoutes);
 router.use('/goals', goalRoutes);
 router.use('/review-cycles', reviewCycleRoutes);
 router.use('/reviews', reviewRoutes);
+router.use('/ai', aiRoutes);
 
 export default router;

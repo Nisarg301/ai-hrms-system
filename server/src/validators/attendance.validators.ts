@@ -30,7 +30,8 @@ export const updateSettingsSchema = z
     }
   });
 
-const reason = z.string().trim().min(1, 'Give a reason').max(500);
+/** Optional, as for leave and an admin's recorded fix (docs/AI_ME_ASSISTANTS.md, section 7). */
+const reason = z.string().trim().max(500).default('');
 
 /** An employee's request: a fix to one day, or work from home for a range. */
 export const createAttendanceRequestSchema = z.discriminatedUnion('kind', [
