@@ -10,6 +10,8 @@ import { ModelClient, ModelMessage, ModelUnavailableError, ollamaClient } from '
 import { modelQueue } from './queue';
 import { smallTalkReply } from './smallTalk';
 import { SubscriptionState } from '../services/subscription.service';
+import { moduleHome } from './modules/navigation.helpers';
+import { NAVIGATION_KEY, PAGE_TOOLS, pageTurn } from './modules/navigation.module';
 import { allowedTools, canUseModule, getModule, modelToolsFor } from './registry';
 import { AiModule, AiResult, AiTool, AiUserError, ApiClient, ConfirmCard, PendingActionView, ToolCallRef, ToolContext, UploadedFile } from './types';
 
@@ -52,6 +54,9 @@ export interface TurnInput {
   conversationId?: string;
   message?: string;
   toolCall?: ToolCallRef & { label?: string };
+  /** The page the drawer is on ("/expenses?tab=summary"), for navigation. */
+  page?: string;
+  subscription?: SubscriptionState;
   emit: (event: AiEvent) => void;
   signal: AbortSignal;
   /** Tests swap these for a scripted model and a fake API. */
@@ -185,7 +190,12 @@ async function loadConversation(user: AuthenticatedUser, moduleKey: string, id?:
   return existing ?? new AiConversationModel({ ...owner, module: moduleKey });
 }
 
-function toolContext(conversation: IAiConversation, user: AuthenticatedUser, latestText: string, opts: { form: boolean; fromButton: boolean }): ToolContext {
+function toolContext(
+  conversation: IAiConversation,
+  user: AuthenticatedUser,
+  latestText: string,
+  opts: { form: boolean; fromButton: boolean; page?: string; subscription?: SubscriptionState }
+): ToolContext {
   const said = conversation.messages.filter((m) => m.role === 'user').slice(-20).map((m) => m.content);
   return { user, today: todayIso(), userText: said.join('\n'), latestText, draft: conversation.draft ?? null, ...opts };
 }
@@ -206,13 +216,20 @@ export async function runTurn(input: TurnInput): Promise<void> {
   const model = input.model ?? ollamaClient;
   const api = input.api ?? createApiClient(input.token);
   const tools = await allowedTools(module, user);
+  // The module's own tools, and the page tools every assistant's buttons may run ("Open Projects").
+  const toolNamed = (name: string) => tools.find((t) => t.name === name) ?? PAGE_TOOLS.find((t) => t.name === name);
   const conversation = await loadConversation(user, module.key, input.conversationId);
   expireStale(conversation);
 
   const latestText = input.message?.trim() ?? '';
   const history = conversation.messages.slice(-HISTORY_MESSAGES);
   addMessage(conversation, { role: 'user', content: latestText || input.toolCall?.label || input.toolCall?.name || '' });
-  const ctx = toolContext(conversation, user, latestText, { form: Boolean(input.toolCall?.form), fromButton: Boolean(input.toolCall) });
+  const ctx = toolContext(conversation, user, latestText, {
+    form: Boolean(input.toolCall?.form),
+    fromButton: Boolean(input.toolCall),
+    page: input.page ?? moduleHome(module.key),
+    subscription: input.subscription,
+  });
 
   const answer = (result: AiResult) => {
     const saved = addMessage(conversation, { role: 'assistant', content: summaryForModel(result), result });
@@ -227,8 +244,8 @@ export async function runTurn(input: TurnInput): Promise<void> {
     emit({ type: 'tool', name: tool.name, label: tool.label });
     if (tool.kind === 'read') {
       const result = await tool.run!(args, api, context);
-      // An answer with files, or one the page follows, always goes to the user as is: model text can't carry them.
-      if (env.AI_FAST_READS || final || result.downloads?.length || result.view) {
+      // An answer with files, or one the page follows or opens, always goes to the user as is: model text can't carry them.
+      if (env.AI_FAST_READS || final || result.downloads?.length || result.view || result.goTo) {
         answer(result);
         return null;
       }
@@ -270,11 +287,20 @@ export async function runTurn(input: TurnInput): Promise<void> {
   try {
     // 1. A chip or button names the tool itself: no model call at all.
     if (input.toolCall) {
-      const tool = tools.find((t) => t.name === input.toolCall!.name);
+      const tool = toolNamed(input.toolCall.name);
       if (!tool) throw new AiUserError('That action is not available to you.');
       const parsed = tool.input.safeParse(input.toolCall.args ?? {});
       if (!parsed.success) throw new AiUserError('That request was not valid.');
       await dispatch(tool, parsed.data as Record<string, unknown>);
+      return;
+    }
+
+    // 1b. "Go to projects", "Jump to dashboard", "Where are leave types?": on every assistant, with
+    //     no model call, and only to pages this user may open (docs/AI_NAVIGATION_ASSISTANT.md).
+    //     First, so "Hey, take me to my leave" isn't taken for a greeting, nor a draft's reply.
+    const toPage = await pageTurn(latestText, ctx, { bare: module.key === NAVIGATION_KEY });
+    if (toPage) {
+      answer(toPage);
       return;
     }
 

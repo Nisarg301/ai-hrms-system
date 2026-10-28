@@ -33,8 +33,9 @@ function fieldErrorsOf(err: ApiError): Record<string, string> | undefined {
 /**
  * One assistant conversation: sending messages and button clicks, the streamed progress,
  * and Confirm/Cancel on cards. `onChanged` runs after a confirmed change, so the page
- * behind the drawer can reload its data; `onDownloads` gets the files a live answer offers, and
- * `onView` the page a live answer moves to (the Expenses tabs and their filters).
+ * behind the drawer can reload its data; `onDownloads` gets the files a live answer offers,
+ * `onView` the page a live answer moves to (the Expenses tabs and their filters), and `onGoTo`
+ * the page a live answer opens ("Go to projects"). `page` is sent with each message.
  */
 export function useAiChat(
   module: string,
@@ -43,6 +44,8 @@ export function useAiChat(
     onSecret?: (secret: { label: string; value: string }) => void;
     onDownloads?: (files: AiDownload[]) => void;
     onView?: (path: string) => void;
+    onGoTo?: (path: string) => void;
+    page?: string;
   } = {}
 ) {
   const [conversationId, setConversationId] = useState<string | undefined>();
@@ -94,6 +97,7 @@ export function useAiChat(
       setError(null);
       setMessages((m) => [...m, { role: 'user', text: shownAs, result: null, action: null, createdAt: new Date().toISOString() }]);
       setPending({ startedAt: Date.now(), state: 'sending', text: '' });
+      let goTo: string | undefined;
       const onEvent = (event: AiStreamEvent) => {
         switch (event.type) {
           case 'status':
@@ -112,6 +116,7 @@ export function useAiChat(
             const result = event.message.result;
             if (result?.autoDownload && result.downloads?.length) optsRef.current.onDownloads?.(result.downloads);
             if (result?.view) optsRef.current.onView?.(result.view);
+            if (result?.goTo) goTo = result.goTo;
             break;
           }
           case 'done':
@@ -123,7 +128,9 @@ export function useAiChat(
         }
       };
       try {
-        await streamAiChat({ module, conversationId, ...request }, onEvent, controller.signal);
+        await streamAiChat({ module, conversationId, page: optsRef.current.page, ...request }, onEvent, controller.signal);
+        // Only once the server has saved the turn: leaving the page closes this drawer and its request.
+        if (goTo && !controller.signal.aborted) optsRef.current.onGoTo?.(goTo);
       } catch (err) {
         if (!controller.signal.aborted) setError(err instanceof ApiError ? err.message : 'The assistant could not be reached.');
       } finally {

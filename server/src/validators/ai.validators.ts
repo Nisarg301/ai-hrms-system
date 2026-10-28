@@ -16,6 +16,8 @@ export const chatSchema = z
         label: z.string().trim().max(120).optional(),
       })
       .optional(),
+    /** The page the drawer is on ("/expenses?tab=summary"), for "You're already on" and navigation. */
+    page: z.string().trim().max(300).regex(/^\/(?!\/)/, 'Must be a path in the app').optional(),
   })
   .strict()
   .refine((v) => Boolean(v.message) !== Boolean(v.toolCall), { message: 'Send either a message or a toolCall' });

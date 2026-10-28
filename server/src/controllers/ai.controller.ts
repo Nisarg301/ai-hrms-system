@@ -83,6 +83,8 @@ export const chat = asyncHandler(async (req: Request, res: Response) => {
       conversationId: req.body.conversationId,
       message: req.body.message,
       toolCall: req.body.toolCall,
+      page: req.body.page,
+      subscription: req.subscription,
       emit,
       signal: controller.signal,
     });

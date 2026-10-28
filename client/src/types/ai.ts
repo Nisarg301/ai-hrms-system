@@ -38,6 +38,8 @@ export interface AiResult {
   autoDownload?: boolean;
   /** The page behind the drawer follows a live answer: a path with its filters ("/expenses?tab=summary&from=…"). */
   view?: string;
+  /** Open this page of the app once a live answer has arrived ("Go to projects"): docs/AI_NAVIGATION_ASSISTANT.md. */
+  goTo?: string;
 }
 
 /** The employee form on a confirm card: ids, not names; '' = empty. */
@@ -264,4 +266,6 @@ export interface AiChatRequest {
   conversationId?: string;
   message?: string;
   toolCall?: AiToolCallRef & { label?: string };
+  /** The page the drawer is on ("/expenses?tab=summary"), for "You're already on" and navigation. */
+  page?: string;
 }

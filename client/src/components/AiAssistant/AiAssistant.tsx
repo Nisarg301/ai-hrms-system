@@ -26,7 +26,7 @@ import { useSpeechInput } from './useSpeechInput';
 
 // The chat assistant (docs/AI_ASSISTANT_PLAN.md): one per module page, on a local Ollama model.
 // The server decides who may use which assistant; this only maps pages to modules, with an
-// example request for the input box.
+// example request for the input box. Every assistant also opens pages ("Go to projects").
 const MODULE_ROUTES: { prefix: string; module: string; example: string }[] = [
   { prefix: ROUTES.employees, module: 'employees', example: 'Add Mike Johnson to Engineering' },
   { prefix: ROUTES.projects, module: 'projects', example: 'Create a project called Apollo due 31 December' },
@@ -37,18 +37,21 @@ const MODULE_ROUTES: { prefix: string; module: string; example: string }[] = [
   { prefix: ROUTES.roles, module: 'roles', example: 'Create a role Auditor with all permissions' },
   { prefix: ROUTES.expenses, module: 'expenses', example: 'Show submitted claims for this month' },
   { prefix: ROUTES.auditLogs, module: 'auditLogs', example: 'Show deleted records in Projects last week' },
-  // The Me page: three of its seven tabs (docs/AI_ME_ASSISTANTS.md); the other four have none.
+  // The Me page: three of its seven tabs (docs/AI_ME_ASSISTANTS.md); the other four get the Navigation assistant.
   { prefix: ROUTES.meLeave, module: 'leave', example: 'Apply for leave from 3 Nov to 5 Nov' },
   { prefix: `${ROUTES.me}/attendance`, module: 'attendance', example: 'Work from home tomorrow' },
   { prefix: `${ROUTES.me}/expenses`, module: 'my-expenses', example: 'New claim for client visit to Pune' },
 ];
+
+// Every other page gets the Navigation assistant, which only opens pages (docs/AI_NAVIGATION_ASSISTANT.md).
+const NAVIGATION_ROUTE = { prefix: '', module: 'navigation', example: 'Go to projects' };
 
 /** Mounted once in AppLayout. Shows a button on pages that have an assistant this user may open. */
 export function AiAssistant() {
   const location = useLocation();
   const user = useAppSelector(selectAuthUser);
   const hasFeature = useHasFeature();
-  const route = MODULE_ROUTES.find((r) => location.pathname.startsWith(r.prefix));
+  const route = MODULE_ROUTES.find((r) => location.pathname.startsWith(r.prefix)) ?? NAVIGATION_ROUTE;
   const moduleKey = route?.module;
   const isMember = user?.role === 'ORG_ADMIN' || user?.role === 'ORG_USER';
   const wanted = Boolean(moduleKey) && isMember && hasFeature('ai');
@@ -69,6 +72,7 @@ export function AiAssistant() {
 function AssistantDrawer({ info, example, prefix }: { info: AiModuleInfo; example: string; prefix: string }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { token } = theme.useToken();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
@@ -91,8 +95,15 @@ function AssistantDrawer({ info, example, prefix }: { info: AiModuleInfo; exampl
     },
     // The page behind the drawer follows a live answer (the Expenses tab and its filters), on its own page only.
     onView: (path) => {
-      if (path === prefix || path.startsWith(`${prefix}?`)) navigate(path, { replace: true });
+      if (prefix && (path === prefix || path.startsWith(`${prefix}?`))) navigate(path, { replace: true });
     },
+    // "Go to projects": the server sends only pages this user may open, and the route guards check again.
+    onGoTo: (path) => {
+      if (!path.startsWith('/') || path.startsWith('//')) return;
+      setOpen(false);
+      navigate(path);
+    },
+    page: `${location.pathname}${location.search}`,
     onSecret: (s) => setSecret(s.value),
     onDownloads: (files) => void downloads.downloadAll(files),
   });

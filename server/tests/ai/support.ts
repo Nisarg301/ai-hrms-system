@@ -9,6 +9,7 @@ import { AiConversationModel, IAiConversation } from '../../src/models/aiConvers
 import { PLAN_MODULES } from '../../src/constants/modules';
 import { EffectivePermissions } from '../../src/permissions/effectivePermissions';
 import { AuthenticatedUser } from '../../src/types/express';
+import { SubscriptionState } from '../../src/services/subscription.service';
 
 // Whole chat turns against a scripted model and an in-memory stand-in for the REST API.
 // Conversations are real Mongoose documents; only findOne/save are kept off the database.
@@ -186,6 +187,8 @@ export interface TurnOptions {
   message?: string;
   toolCall?: { name: string; args: Record<string, unknown>; form?: boolean };
   conversationId?: string;
+  page?: string;
+  subscription?: SubscriptionState;
 }
 
 /** One chat turn; returns every event, the last message shown, and the conversation id. */
@@ -198,6 +201,8 @@ export async function turn(opts: TurnOptions) {
     conversationId: opts.conversationId,
     message: opts.message,
     toolCall: opts.toolCall,
+    page: opts.page,
+    subscription: opts.subscription,
     emit: (e) => events.push(e),
     signal: new AbortController().signal,
     model: opts.model ?? scriptedModel(),

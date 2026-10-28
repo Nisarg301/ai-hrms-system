@@ -12,13 +12,15 @@ import { expenseModule } from './modules/expense.module';
 import { exportsModule } from './modules/exports.module';
 import { leaveModule } from './modules/leave.module';
 import { myExpenseModule } from './modules/myExpense.module';
+import { navigationModule } from './modules/navigation.module';
 import { projectModule } from './modules/project.module';
 import { roleModule } from './modules/role.module';
 import { taskModule } from './modules/task.module';
 import { ModelTool } from './ollama.client';
 import { AiModule, AiTool } from './types';
 
-const MODULES: AiModule[] = [employeeModule, projectModule, departmentModule, exportsModule, taskModule, documentModule, roleModule, expenseModule, leaveModule, attendanceModule, myExpenseModule, auditLogModule];
+// The Navigation assistant is for pages without an assistant of their own; every other one opens pages too.
+const MODULES: AiModule[] = [employeeModule, projectModule, departmentModule, exportsModule, taskModule, documentModule, roleModule, expenseModule, leaveModule, attendanceModule, myExpenseModule, auditLogModule, navigationModule];
 
 export const AI_MODULE_KEYS = MODULES.map((m) => m.key) as [string, ...string[]];
 

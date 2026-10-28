@@ -13,6 +13,7 @@ Module documents:
 - [Expenses: filter and export claims, the spending summary, and categories through chat](AI_EXPENSES_ASSISTANT.md)
 - [Me page: apply for leave, work from home and attendance fixes, and my expense claims through chat](AI_ME_ASSISTANTS.md)
 - [Audit Logs: load the audit log by module, action and dates through chat](AI_AUDIT_LOGS_ASSISTANT.md)
+- [Navigation: open any page the user may open, from any assistant, by typing or speaking](AI_NAVIGATION_ASSISTANT.md)
 
 **Contents:** Product objective and overview · 1 Quick start · 2 Decisions · 3 Goal · 4 Architecture · 5 Running on CPU · 6 Configuration · 7 Server design · 8 Plan gating · 9 Client design and voice · 10 Rollout · 11 Security · 12 Testing · 13 File flow
 
@@ -798,6 +799,7 @@ Details:
 | **1A+. Documents** (built 2026-10-19) | List, count and download documents; upload them (title, description and category, then the file, sent with Confirm), rename, recategorise, archive, replace the file and delete; tools follow the permission matrix ([AI_DOCUMENTS_ASSISTANT.md](AI_DOCUMENTS_ASSISTANT.md)) | done |
 | **1A+. Roles** (built 2026-10-21) | ORG_ADMIN lists roles and creates, changes and deletes them; the server reads the permissions from the message ("read and update on tasks, select all on documents"), and the card holds the page's permission matrix ([AI_ROLES_ASSISTANT.md](AI_ROLES_ASSISTANT.md)) | done |
 | **1A+. Expenses admin** (built 2026-10-21, taken from 1B) | ORG_ADMIN lists claims by status, employee, category and dates, exports the CSV, sees the summary for a range, and creates, changes and deletes categories; the page's tab and filters follow the chat ([AI_EXPENSES_ASSISTANT.md](AI_EXPENSES_ASSISTANT.md)). Approving and paying stay in 1B. | done |
+| **1A+. Navigation** (built 2026-10-28) | "Go to projects", "Jump to dashboard", "Where are leave types?" on every assistant, and a Navigation assistant on pages without one of their own; only pages the user's role, permissions and plan allow, as the route guards do ([AI_NAVIGATION_ASSISTANT.md](AI_NAVIGATION_ASSISTANT.md)) | done |
 | **1B. Leave and expense approvals** | Leave tools for employees and ORG_ADMIN; expense tools for ORG_ADMIN plus "my claims"; Approve/Reject buttons in result tables. Ships in the first release with 1A. | 3–4 days |
 | **2. Attendance and Me** | Clock in/out, my month, attendance requests; ORG_ADMIN attendance approvals; profile reads and updates | 2–3 days |
 | **3. Employee expenses** | Create a claim, add items, submit, withdraw (receipts stay in the UI). Tasks moved to 1A+. | 2 days |
@@ -969,6 +971,7 @@ It tries these in order, and stops at the first that applies:
 | Order | What | Where | Example |
 |---|---|---|---|
 | 1 | A chip or a button named the tool | `agent.service.ts` | "Show more" |
+| 1b | A request to open a page: opened, or refused, at once, no model | `modules/navigation.module.ts` `pageTurn()` ([AI_NAVIGATION_ASSISTANT.md](AI_NAVIGATION_ASSISTANT.md)) | "Jump to dashboard", "Go to the projects page" |
 | 2 | Small talk: answered at once, no tool | `smallTalk.ts` | "Thanks!" |
 | 2b | Another page's work: says which page | the module's `elsewhere` | "Apply leave" on the Attendance tab |
 | 3 | A reply to a question the assistant just asked | the tool's `fillFromReply` | "31 December", after "What's the deadline?" |
@@ -1074,6 +1077,7 @@ For `create_project`:
 | Me: Attendance | `attendance.module.ts`, `me.helpers.ts` | `/attendance/requests`, `/attendance/me`, `/leave/requests/mine` | `AiAttendanceForms.tsx` | `refreshMyAttendance` |
 | Me: Expenses | `myExpense.module.ts`, `me.helpers.ts` | `/expenses`, `/expense-categories` (the receipt as a file) | `AiClaimForm.tsx` + `AiFileField.tsx` | `fetchMyClaims` |
 | Audit Logs | `auditLog.module.ts`, `auditLog.helpers.ts` | `/audit-logs` | none (read-only) | — (answers move the page) |
+| Navigation (every assistant, and its own on pages without one) | `navigation.module.ts`, `navigation.helpers.ts` | none | none | — (answers open a page: `goTo`) |
 
 ### 13.7 Inside `runTurn()`: a message, a button, and what Ollama does
 

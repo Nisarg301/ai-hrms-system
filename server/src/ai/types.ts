@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ModuleName, PlanFeature } from '../constants/modules';
 import { PermissionAction } from '../permissions/checkPermission';
+import { SubscriptionState } from '../services/subscription.service';
 import { AuthenticatedUser } from '../types/express';
 
 /** One call to the existing REST API, relative to /api/v1. */
@@ -81,6 +82,11 @@ export interface AiResult {
    * ("/expenses?tab=summary&from=2026-10-01&to=2026-10-21"). Only for a live answer.
    */
   view?: string;
+  /**
+   * Open this page of the app, after the answer has arrived (docs/AI_NAVIGATION_ASSISTANT.md).
+   * Only ever a path from the navigation page list that the user may open. Only for a live answer.
+   */
+  goTo?: string;
 }
 
 /** Values of the editable employee form on a confirm card. Ids, not names. */
@@ -278,6 +284,10 @@ export interface ToolContext {
   fromButton: boolean;
   /** This call was handed over by another tool's prepare() (see Prepared 'reroute'). */
   rerouted?: boolean;
+  /** The page the drawer is on ("/expenses?tab=summary"), or the assistant's own page. */
+  page?: string;
+  /** The organization's plan, for which pages exist (navigation). */
+  subscription?: SubscriptionState;
 }
 
 export interface PendingActionView {
