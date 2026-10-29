@@ -11,7 +11,7 @@ Module documents:
 - [Documents: list, upload, change, download and delete documents through chat, files included](AI_DOCUMENTS_ASSISTANT.md)
 - [Roles: list, create, change and delete roles and their permissions through chat](AI_ROLES_ASSISTANT.md)
 - [Expenses: filter and export claims, the spending summary, and categories through chat](AI_EXPENSES_ASSISTANT.md)
-- [Me page: apply for leave, work from home and attendance fixes, and my expense claims through chat](AI_ME_ASSISTANTS.md)
+- [Me page: leave, work from home and attendance fixes, my expense claims, goals and reviews, profile, team and holidays through chat](AI_ME_ASSISTANTS.md)
 - [Audit Logs: load the audit log by module, action and dates through chat](AI_AUDIT_LOGS_ASSISTANT.md)
 - [Navigation: open any page the user may open, from any assistant, by typing or speaking](AI_NAVIGATION_ASSISTANT.md)
 
@@ -799,6 +799,7 @@ Details:
 | **1A+. Documents** (built 2026-10-19) | List, count and download documents; upload them (title, description and category, then the file, sent with Confirm), rename, recategorise, archive, replace the file and delete; tools follow the permission matrix ([AI_DOCUMENTS_ASSISTANT.md](AI_DOCUMENTS_ASSISTANT.md)) | done |
 | **1A+. Roles** (built 2026-10-21) | ORG_ADMIN lists roles and creates, changes and deletes them; the server reads the permissions from the message ("read and update on tasks, select all on documents"), and the card holds the page's permission matrix ([AI_ROLES_ASSISTANT.md](AI_ROLES_ASSISTANT.md)) | done |
 | **1A+. Expenses admin** (built 2026-10-21, taken from 1B) | ORG_ADMIN lists claims by status, employee, category and dates, exports the CSV, sees the summary for a range, and creates, changes and deletes categories; the page's tab and filters follow the chat ([AI_EXPENSES_ASSISTANT.md](AI_EXPENSES_ASSISTANT.md)). Approving and paying stay in 1B. | done |
+| **1A+. Me page** (Leave, Attendance and Expenses built 2026-10-22; Performance, Profile, Team and Holidays 2026-10-29, taken from Phases 2 and 4) | An assistant on each of the seven Me tabs: apply for and cancel leave, work from home and fixes, claims with receipts; goals, check-ins and reviews written a question at a time; the date of birth and introduction; answers about the team and the holiday calendar ([AI_ME_ASSISTANTS.md](AI_ME_ASSISTANTS.md)) | done |
 | **1A+. Navigation** (built 2026-10-28) | "Go to projects", "Jump to dashboard", "Where are leave types?" on every assistant, and a Navigation assistant on pages without one of their own; only pages the user's role, permissions and plan allow, as the route guards do ([AI_NAVIGATION_ASSISTANT.md](AI_NAVIGATION_ASSISTANT.md)) | done |
 | **1B. Leave and expense approvals** | Leave tools for employees and ORG_ADMIN; expense tools for ORG_ADMIN plus "my claims"; Approve/Reject buttons in result tables. Ships in the first release with 1A. | 3–4 days |
 | **2. Attendance and Me** | Clock in/out, my month, attendance requests; ORG_ADMIN attendance approvals; profile reads and updates | 2–3 days |
@@ -972,9 +973,9 @@ It tries these in order, and stops at the first that applies:
 |---|---|---|---|
 | 1 | A chip or a button named the tool | `agent.service.ts` | "Show more" |
 | 1b | A request to open a page: opened, or refused, at once, no model | `modules/navigation.module.ts` `pageTurn()` ([AI_NAVIGATION_ASSISTANT.md](AI_NAVIGATION_ASSISTANT.md)) | "Jump to dashboard", "Go to the projects page" |
-| 2 | Small talk: answered at once, no tool | `smallTalk.ts` | "Thanks!" |
-| 2b | Another page's work: says which page | the module's `elsewhere` | "Apply leave" on the Attendance tab |
-| 3 | A reply to a question the assistant just asked | the tool's `fillFromReply` | "31 December", after "What's the deadline?" |
+| 2 | Small talk: answered at once, no tool. Skipped while a review or introduction answer is awaited (`ToolDraft.freeText`) | `smallTalk.ts` | "Thanks!" |
+| 2b | Another page's work: says which page. Skipped like step 2 | the module's `elsewhere` | "Apply leave" on the Attendance tab |
+| 3 | A reply to a question the assistant just asked | the tool's `fillFromReply` | "31 December", after "What's the deadline?"; a review answer, word for word |
 | 4 | A message the module reads by itself, with no model | the module's `direct` | "Download employees and projects" |
 | 5 | **The AI model picks a tool** | `queue.ts`, `ollama.client.ts` | "Create a project called Apollo due 31 December" |
 
@@ -1076,6 +1077,10 @@ For `create_project`:
 | Me: Leave | `leave.module.ts`, `me.helpers.ts` | `/leave/balances`, `/leave/preview`, `/leave/requests` | `AiLeaveForm.tsx` | `refreshAfterLeaveChange` |
 | Me: Attendance | `attendance.module.ts`, `me.helpers.ts` | `/attendance/requests`, `/attendance/me`, `/leave/requests/mine` | `AiAttendanceForms.tsx` | `refreshMyAttendance` |
 | Me: Expenses | `myExpense.module.ts`, `me.helpers.ts` | `/expenses`, `/expense-categories` (the receipt as a file) | `AiClaimForm.tsx` + `AiFileField.tsx` | `fetchMyClaims` |
+| Me: Performance | `performance.module.ts`, `performance.helpers.ts` | `/goals`, `/reviews`, `/people` | `AiPerformanceForms.tsx` (goal, check-in, review) | `fetchMyGoals`, `fetchTeamGoals`, `fetchMyReviews`, `fetchReviewsToWrite`; lists move the section |
+| Me: Profile | `myProfile.module.ts`, `me.helpers.ts` | `/auth/me`, `/people`, `/me/profile-details`, `/me/introduction` | `AiProfileForms.tsx` (date of birth, introduction) | `fetchMyIntroduction`, `fetchMyDetails` |
+| Me: Team | `myTeam.module.ts`, `me.helpers.ts` | `/me/team` | none (read-only) | — |
+| Me: Holidays | `myHolidays.module.ts`, `me.helpers.ts` | `/holidays` | none (read-only) | — (answers move the tab's year) |
 | Audit Logs | `auditLog.module.ts`, `auditLog.helpers.ts` | `/audit-logs` | none (read-only) | — (answers move the page) |
 | Navigation (every assistant, and its own on pages without one) | `navigation.module.ts`, `navigation.helpers.ts` | none | none | — (answers open a page: `goTo`) |
 

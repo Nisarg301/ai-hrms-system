@@ -1125,3 +1125,235 @@ export class FakeAuditApi implements ApiClient {
     return [...this.calls].reverse().find((c) => c.path === '/audit-logs')?.query;
   }
 }
+
+// ---- the Me page's Performance, Profile, Team and Holidays tabs (docs/AI_ME_ASSISTANTS.md, sections 6–9)
+// The signed-in employee is Priya Shah: she reports to Rahul Mehta, with teammates Asha Rao and
+// Vikram Singh, and Neha Gupta reports to her. Today is Thu 22 Oct 2026.
+
+export const ME = employeeUser.id;
+export const P_RAHUL = id();
+export const P_ASHA = id();
+export const P_VIKRAM = id();
+export const P_NEHA = id();
+
+export interface MePerson {
+  id: string;
+  name: string;
+  jobTitle: string | null;
+  departmentName: string | null;
+  reportsTo: string | null;
+  joiningDate: string | null;
+}
+
+export const ME_PEOPLE: MePerson[] = [
+  { id: P_ASHA, name: 'Asha Rao', jobTitle: 'QA Engineer', departmentName: 'Engineering', reportsTo: P_RAHUL, joiningDate: '2024-06-10' },
+  { id: P_NEHA, name: 'Neha Gupta', jobTitle: 'Frontend Engineer', departmentName: 'Engineering', reportsTo: ME, joiningDate: '2026-01-05' },
+  { id: ME, name: 'Priya Shah', jobTitle: 'Backend Engineer', departmentName: 'Engineering', reportsTo: P_RAHUL, joiningDate: '2025-03-03' },
+  { id: P_RAHUL, name: 'Rahul Mehta', jobTitle: 'Engineering Manager', departmentName: 'Engineering', reportsTo: null, joiningDate: '2022-02-01' },
+  { id: P_VIKRAM, name: 'Vikram Singh', jobTitle: 'DevOps Engineer', departmentName: 'Engineering', reportsTo: P_RAHUL, joiningDate: '2023-09-18' },
+];
+const mePerson = (pid: string) => ME_PEOPLE.find((p) => p.id === pid) ?? null;
+
+export interface GoalRow {
+  id: string;
+  ownerId: string;
+  owner: MePerson | null;
+  title: string;
+  description: string;
+  startDate: string;
+  dueDate: string;
+  weight: number | null;
+  progress: number;
+  status: 'on_track' | 'at_risk' | 'behind' | 'completed' | 'cancelled';
+  overdue: boolean;
+  checkInCount: number;
+  relation?: 'owner' | 'manager' | 'admin';
+}
+
+export function goal(title: string, progress: number, status: GoalRow['status'], dueDate: string, weight: number | null, ownerId = ME): GoalRow {
+  return { id: id(), ownerId, owner: mePerson(ownerId), title, description: '', startDate: '2026-07-01', dueDate, weight, progress, status, overdue: dueDate < '2026-10-22' && status !== 'completed' && status !== 'cancelled', checkInCount: 0 };
+}
+
+export const QUESTIONS = [
+  { id: 'q1', text: 'What went well this period?' },
+  { id: 'q2', text: 'What could have gone better?' },
+  { id: 'q3', text: 'What do you want to focus on next?' },
+];
+const H2 = { id: id(), name: 'H2 2026', periodFrom: '2026-07-01', periodTo: '2026-12-31', selfDueDate: '2026-11-13', managerDueDate: '2026-11-27', status: 'launched' as const };
+const H1 = { id: id(), name: 'H1 2026', periodFrom: '2026-01-01', periodTo: '2026-06-30', selfDueDate: '2026-05-15', managerDueDate: '2026-05-29', status: 'closed' as const };
+
+type ReviewPart = { status: 'not_started' | 'draft' | 'submitted'; answers: { questionId: string; question: string; text: string }[]; rating: number | null };
+const emptyPart = (): ReviewPart => ({ status: 'not_started', answers: QUESTIONS.map((q) => ({ questionId: q.id, question: q.text, text: '' })), rating: null });
+
+export interface ReviewRow {
+  id: string;
+  cycle: typeof H2 | typeof H1;
+  employeeId: string;
+  self: ReviewPart;
+  manager: ReviewPart;
+  released: boolean;
+}
+
+/** /people, /goals/* and /reviews/*, with the API's own checks of who may do what (performance.service). */
+export class FakePerformanceApi implements ApiClient {
+  calls: ApiCall[] = [];
+  goals: GoalRow[] = [goal('Launch the new onboarding flow', 40, 'on_track', '2026-12-31', 40), goal('Hire two backend engineers', 20, 'at_risk', '2026-11-30', 30), goal('Ship the login page', 70, 'on_track', '2026-11-20', null, P_NEHA)];
+  reviews: ReviewRow[] = [
+    { id: id(), cycle: H2, employeeId: ME, self: emptyPart(), manager: emptyPart(), released: false },
+    { id: id(), cycle: H1, employeeId: ME, self: { ...emptyPart(), status: 'submitted' }, manager: { ...emptyPart(), status: 'submitted', rating: 4 }, released: true },
+    { id: id(), cycle: H2, employeeId: P_NEHA, self: { ...emptyPart(), status: 'submitted' }, manager: emptyPart(), released: false },
+  ];
+  constructor(public me = ME) {}
+
+  private reports = () => ME_PEOPLE.filter((p) => p.reportsTo === this.me).map((p) => p.id);
+
+  async get<T>(path: string, query?: Record<string, unknown>): Promise<T> {
+    return (await this.page<T>(path, query)).data;
+  }
+
+  async page<T>(path: string, query: Record<string, unknown> = {}) {
+    this.calls.push({ method: 'GET', path, query });
+    const ok = (data: unknown) => ({ data: data as T, meta: {} });
+    if (path === '/people') return ok(ME_PEOPLE);
+    if (path === '/goals/mine') return ok(this.goals.filter((g) => g.ownerId === this.me));
+    if (path === '/goals/team') {
+      if (query.ownerId && !this.reports().includes(String(query.ownerId))) throw new ApiCallError(404, 'Employee not found');
+      return ok(this.goals.filter((g) => (query.ownerId ? g.ownerId === query.ownerId : this.reports().includes(g.ownerId))));
+    }
+    if (path === '/reviews/mine') {
+      return ok(this.reviews.filter((r) => r.employeeId === this.me).map((r) => ({ id: r.id, cycle: r.cycle, selfStatus: r.self.status, released: r.released, managerRating: r.released ? r.manager.rating : null })));
+    }
+    if (path === '/reviews/to-write') {
+      return ok(this.reviews.filter((r) => this.reports().includes(r.employeeId)).map((r) => ({ id: r.id, cycle: r.cycle, employee: mePerson(r.employeeId), selfStatus: r.self.status, managerStatus: r.manager.status })));
+    }
+    const review = /^\/reviews\/(\w+)$/.exec(path);
+    if (review) return ok(this.detail(review[1]));
+    throw new Error(`Unexpected GET ${path}`);
+  }
+
+  private detail(reviewId: string) {
+    const r = this.reviews.find((x) => x.id === reviewId);
+    if (!r) throw new ApiCallError(404, 'Review not found');
+    const role = r.employeeId === this.me ? 'employee' : 'reviewer';
+    const open = r.cycle.status === 'launched';
+    return {
+      id: r.id,
+      cycle: { ...r.cycle, questions: QUESTIONS },
+      role,
+      employee: mePerson(r.employeeId),
+      selfStatus: r.self.status,
+      self: r.self,
+      manager: role === 'employee' && !r.released ? null : r.manager,
+      canWriteSelf: role === 'employee' && open && r.self.status !== 'submitted',
+      canWriteManager: role === 'reviewer' && open && r.manager.status !== 'submitted',
+    };
+  }
+
+  async send<T>(call: ApiCall): Promise<T> {
+    if (call.method === 'GET') return this.get<T>(call.path, call.query);
+    this.calls.push(call);
+    const body = (call.body ?? {}) as Record<string, unknown>;
+    if (call.method === 'POST' && call.path === '/goals') {
+      const ownerId = (body.ownerId as string | undefined) ?? this.me;
+      if (ownerId !== this.me && !this.reports().includes(ownerId)) throw new ApiCallError(403, 'You can set goals for yourself and your direct reports');
+      const row = { ...goal(String(body.title), 0, 'on_track', String(body.dueDate), (body.weight as number | null) ?? null, ownerId), startDate: String(body.startDate), description: String(body.description ?? '') };
+      this.goals.push(row);
+      return { ...row, relation: ownerId === this.me ? 'owner' : 'manager' } as T;
+    }
+    const goalPath = /^\/goals\/(\w+)(\/check-ins)?$/.exec(call.path);
+    if (goalPath) {
+      const g = this.goals.find((x) => x.id === goalPath[1]);
+      if (!g) throw new ApiCallError(404, 'Goal not found');
+      if (goalPath[2]) Object.assign(g, { progress: body.progress, status: body.status, checkInCount: g.checkInCount + 1 });
+      else Object.assign(g, body);
+      return { ...g } as T;
+    }
+    const part = /^\/reviews\/(\w+)\/(self|manager)(\/submit)?$/.exec(call.path);
+    if (part) {
+      const r = this.reviews.find((x) => x.id === part[1])!;
+      const answers = body.answers as { questionId: string; text: string }[];
+      const rating = body.rating as number | null;
+      if (part[3]) {
+        const left = QUESTIONS.filter((q) => !answers.find((a) => a.questionId === q.id)?.text.trim()).length;
+        if (left || rating === null) throw new ApiCallError(400, 'Validation failed', { fieldErrors: { answers: [`Answer every question (${left} left)`] } });
+      }
+      r[part[2] as 'self' | 'manager'] = { status: part[3] ? 'submitted' : 'draft', answers: QUESTIONS.map((q) => ({ questionId: q.id, question: q.text, text: answers.find((a) => a.questionId === q.id)?.text ?? '' })), rating };
+      return this.detail(r.id) as T;
+    }
+    throw new Error(`Unexpected ${call.method} ${call.path}`);
+  }
+
+  writes() {
+    return this.calls.filter((c) => c.method !== 'GET');
+  }
+}
+
+export interface HolidayRow {
+  id: string;
+  name: string;
+  date: string;
+  description: string;
+}
+
+export const holiday = (name: string, date: string, description = ''): HolidayRow => ({ id: id(), name, date, description });
+
+/** /auth/me, /people, /me/* and /holidays for Priya. */
+export class FakeMeInfoApi implements ApiClient {
+  calls: ApiCall[] = [];
+  dateOfBirth: string | null = null;
+  introduction = { about: 'Backend engineer from Pune.', hobbies: 'Reading', lovesAboutJob: '' };
+  team = {
+    today: '2026-10-22',
+    week: { from: '2026-10-19', to: '2026-10-25' },
+    manager: { ...mePerson(P_RAHUL)!, leaveToday: null, leaveThisWeek: [] as string[] } as Record<string, unknown> | null,
+    peers: [
+      { ...mePerson(P_ASHA)!, leaveToday: { halfDay: 'first' }, leaveThisWeek: ['2026-10-22'] },
+      { ...mePerson(P_VIKRAM)!, leaveToday: null, leaveThisWeek: ['2026-10-23'] },
+    ] as Record<string, unknown>[],
+    directReports: [{ ...mePerson(P_NEHA)!, leaveToday: null, leaveThisWeek: [] }] as Record<string, unknown>[],
+  };
+  holidays: HolidayRow[] = [
+    holiday('Independence Day', '2026-08-15'),
+    holiday('Gandhi Jayanti', '2026-10-02'),
+    holiday('Dussehra', '2026-10-20'),
+    holiday('Diwali', '2026-11-08', 'Festival of lights'),
+    holiday('Guru Nanak Jayanti', '2026-11-24'),
+    holiday('Christmas', '2026-12-25'),
+    holiday('Republic Day', '2027-01-26'),
+  ];
+
+  async get<T>(path: string, query?: Record<string, unknown>): Promise<T> {
+    return (await this.page<T>(path, query)).data;
+  }
+
+  async page<T>(path: string, query: Record<string, unknown> = {}) {
+    this.calls.push({ method: 'GET', path, query });
+    const ok = (data: unknown) => ({ data: data as T, meta: {} });
+    if (path === '/auth/me') return ok({ user: { name: 'Priya Shah', email: 'priya@acme.com' } });
+    if (path === '/people') return ok(ME_PEOPLE);
+    if (path === '/me/profile-details') return ok({ dateOfBirth: this.dateOfBirth });
+    if (path === '/me/introduction') return ok({ ...this.introduction });
+    if (path === '/me/team') return ok(this.team);
+    if (path === '/holidays') return ok(this.holidays.filter((h) => h.date.startsWith(String(query.year))));
+    throw new Error(`Unexpected GET ${path}`);
+  }
+
+  async send<T>(call: ApiCall): Promise<T> {
+    if (call.method === 'GET') return this.get<T>(call.path, call.query);
+    this.calls.push(call);
+    const body = (call.body ?? {}) as Record<string, unknown>;
+    if (call.path === '/me/profile-details') {
+      this.dateOfBirth = (body.dateOfBirth as string | null) ?? null;
+      return { dateOfBirth: this.dateOfBirth } as T;
+    }
+    if (call.path === '/me/introduction') {
+      Object.assign(this.introduction, body);
+      return { ...this.introduction } as T;
+    }
+    throw new Error(`Unexpected ${call.method} ${call.path}`);
+  }
+
+  writes() {
+    return this.calls.filter((c) => c.method !== 'GET');
+  }
+}

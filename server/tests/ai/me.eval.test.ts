@@ -2,13 +2,18 @@ import { AiEvent, ChatMessageView, toolCallFromText } from '../../src/ai/agent.s
 import { attendanceModule } from '../../src/ai/modules/attendance.module';
 import { leaveModule } from '../../src/ai/modules/leave.module';
 import { myExpenseModule } from '../../src/ai/modules/myExpense.module';
+import { myHolidaysModule } from '../../src/ai/modules/myHolidays.module';
+import { myProfileModule } from '../../src/ai/modules/myProfile.module';
+import { myTeamModule } from '../../src/ai/modules/myTeam.module';
+import { performanceModule } from '../../src/ai/modules/performance.module';
 import { ModelClient, ModelToolCall, ollamaClient } from '../../src/ai/ollama.client';
 import { env } from '../../src/config/env';
 import { AiModule, ApiClient } from '../../src/ai/types';
+import { roleRepository } from '../../src/repositories/role.repository';
 import * as dates from '../../src/utils/dates';
-import { category, employeeUser, FakeMeApi, FakeMyExpenseApi, id, leaveTypes, PAID, stubPersistence, turn } from './support';
+import { category, employeeUser, FakeMeApi, FakeMeInfoApi, FakeMyExpenseApi, FakePerformanceApi, id, leaveTypes, PAID, stubPersistence, turn } from './support';
 
-// The Me page eval set (docs/AI_ME_ASSISTANTS.md, section 10) against the real local model.
+// The Me page eval set (docs/AI_ME_ASSISTANTS.md, section 14) against the real local model.
 // Off by default; run it before a release or after changing OLLAMA_MODEL:
 //   RUN_OLLAMA=1 OLLAMA_MODEL=llama3.2 npx jest tests/ai/me.eval --runInBand
 // The APIs are in-memory fakes, so no real data is touched. Today is Thu 22 Oct 2026.
@@ -19,6 +24,8 @@ const TODAY = '2026-10-22';
 beforeEach(() => {
   jest.spyOn(dates, 'todayIso').mockReturnValue(TODAY);
   jest.spyOn(dates, 'now').mockReturnValue(new Date('2026-10-22T08:00:00Z'));
+  // Navigation (step 1b) reads the employee's role for "Show my goals" and the like.
+  jest.spyOn(roleRepository, 'findById').mockResolvedValue({ permissions: [] } as never);
 });
 
 type Outcome = (last: ChatMessageView) => boolean;
@@ -127,6 +134,87 @@ function expenseApi(): ApiClient & { writes(): unknown[] } {
   return api;
 }
 
+// ---------------------------------------------------------------- performance (section 6)
+
+const cardTitle = (l: ChatMessageView, title: string) => l.action?.card.title === title;
+
+const PERFORMANCE: Case[] = [
+  { message: 'Set a goal to hire a designer by 31 Jan, weight 20%', tool: 'create_goal', outcome: (l) => shows(l, { Goal: 'Hire a designer', Due: 'Sun 31 Jan 2027', Weight: '20%' }) },
+  { message: 'I want a new goal: write the API docs by 15 Dec', tool: 'create_goal', outcome: (l) => shows(l, { Goal: 'Write the API docs', Due: 'Tue 15 Dec 2026' }) },
+  { message: 'Set a goal to improve test coverage', tool: 'create_goal', outcome: (l) => says(l, /When is \*\*Improve test coverage\*\* due/) },
+  { message: 'Set a goal for Neha to close 10 deals by 31 Dec', tool: 'create_goal', outcome: (l) => cardTitle(l, 'New goal for Neha Gupta') && shows(l, { Goal: 'Close 10 deals' }) },
+  // A misrouted check-in is sent to check_in_goal (Prepared 'reroute').
+  { message: "I'm at 60% on the onboarding goal", tool: 'check_in_goal|create_goal|update_goal', outcome: (l) => cardTitle(l, 'Check in') && shows(l, { Progress: '60%' }) },
+  { message: 'Mark the hiring goal as completed', tool: 'check_in_goal|update_goal', outcome: (l) => shows(l, { Progress: '100%', Status: 'Completed' }) },
+  { message: 'Hiring is behind because two candidates dropped out', tool: 'check_in_goal|update_goal', outcome: (l) => shows(l, { Status: 'Behind', Comment: 'two candidates dropped out' }) },
+  { message: 'Cancel the hiring goal', tool: 'check_in_goal|update_goal', outcome: (l) => cardTitle(l, 'Cancel this goal?') },
+  { message: "Move the onboarding goal's due date to 15 Jan", tool: 'update_goal|check_in_goal', outcome: (l) => shows(l, { Due: 'Fri 15 Jan 2027' }) },
+  { message: 'Show my goals', tool: 'list_goals', outcome: (l) => says(l, /^\*\*2 goals\*\*/) },
+  { message: "Which of my team's goals need attention?", tool: 'list_goals', outcome: (l) => says(l, /in your team/) },
+  { message: 'Show my reviews', tool: 'list_reviews', outcome: (l) => l.result?.table?.rows.length === 2 },
+  { message: 'Which reviews do I have to write?', tool: 'list_reviews', outcome: (l) => Boolean(l.result?.buttons?.some((b) => b.label === 'Write review: Neha Gupta')) },
+  { message: 'Write my self review', tool: 'write_review', outcome: (l) => says(l, /^\*\*Question 1 of 3\*\* · H2 2026/) },
+  { message: "I'd like to write Neha's review now", tool: 'write_review', outcome: (l) => says(l, /for \*\*Neha Gupta\*\*'s review/) },
+  { message: 'Apply leave tomorrow', tool: 'none', outcome: (l) => says(l, /Leave/) },
+];
+
+// ---------------------------------------------------------------- profile (section 7)
+
+const PROFILE: Case[] = [
+  { message: 'Who is my manager?', tool: 'my_profile', outcome: (l) => says(l, /Rahul Mehta/) },
+  { message: "What's my job title?", tool: 'my_profile', outcome: (l) => says(l, /Backend Engineer/) },
+  { message: 'When did I join the company?', tool: 'my_profile', outcome: (l) => says(l, /Mon 3 Mar 2025/) },
+  { message: 'What is my email address?', tool: 'my_profile', outcome: (l) => says(l, /priya@acme\.com/) },
+  { message: 'Show my profile', tool: 'my_profile', outcome: (l) => Boolean(l.result?.table?.rows.length) },
+  { message: 'My date of birth is 24 Oct 1995', tool: 'set_birthday', outcome: (l) => shows(l, { 'Date of birth': 'Tue 24 Oct 1995' }) },
+  { message: 'I was born on 24th October', tool: 'set_birthday', outcome: (l) => says(l, /Which year were you born/) },
+  { message: 'Remove my date of birth', tool: 'set_birthday', outcome: (l) => cardTitle(l, 'Remove your date of birth?') },
+  { message: 'Set my hobbies to cycling and chess', tool: 'update_introduction', outcome: (l) => shows(l, { 'My hobbies': 'Cycling and chess' }) },
+  { message: 'What I love about my job is the people', tool: 'update_introduction', outcome: (l) => shows(l, { 'What I love about my job': 'The people' }) },
+  { message: 'Write my introduction', tool: 'update_introduction', outcome: (l) => says(l, /^\*\*About me\*\* \(1 of 3\)/) },
+  { message: 'Change my job title to Senior Engineer', tool: 'none', outcome: (l) => says(l, /admin keeps your \*\*job title\*\*/) },
+  { message: 'Apply leave tomorrow', tool: 'none', outcome: (l) => says(l, /Leave/) },
+];
+
+function profileApi(): FakeMeInfoApi {
+  const api = new FakeMeInfoApi();
+  api.dateOfBirth = '1994-05-10';
+  return api;
+}
+
+// ---------------------------------------------------------------- team (section 8)
+
+const TEAM: Case[] = [
+  { message: 'Who is my manager?', tool: 'my_team', outcome: (l) => says(l, /Rahul Mehta/) },
+  { message: 'Who is on leave today?', tool: 'my_team', outcome: (l) => says(l, /Asha Rao/) },
+  { message: "Who's off this week?", tool: 'my_team', outcome: (l) => says(l, /Vikram Singh/) },
+  { message: 'Is Vikram available on Friday?', tool: 'my_team', outcome: (l) => says(l, /on leave on Fri 23 Oct/) },
+  { message: 'Is anyone from my team out tomorrow?', tool: 'my_team', outcome: (l) => says(l, /Vikram/) },
+  { message: 'Who reports to me?', tool: 'my_team', outcome: (l) => says(l, /Neha Gupta/) },
+  { message: 'Who are my teammates?', tool: 'my_team', outcome: (l) => says(l, /Asha Rao, Vikram Singh/) },
+  { message: 'Show my team', tool: 'my_team', outcome: (l) => l.result?.table?.rows.length === 4 },
+  { message: 'Tell me about Asha', tool: 'my_team', outcome: (l) => says(l, /Asha Rao/) },
+  { message: 'Apply leave tomorrow', tool: 'none', outcome: (l) => says(l, /Leave/) },
+  { message: 'When is the next holiday?', tool: 'none', outcome: (l) => says(l, /Holidays/) },
+];
+
+// ---------------------------------------------------------------- holidays (section 9)
+
+const HOLIDAYS: Case[] = [
+  { message: 'When is the next holiday?', tool: 'list_holidays', outcome: (l) => says(l, /Diwali/) },
+  { message: "Show this year's holidays", tool: 'list_holidays', outcome: (l) => l.result?.table?.rows.length === 6 },
+  { message: 'Holidays in December', tool: 'list_holidays', outcome: (l) => says(l, /Christmas/) },
+  { message: 'Is 25 Dec a holiday?', tool: 'list_holidays', outcome: (l) => says(l, /^Yes/) },
+  { message: 'Is 3 November a holiday?', tool: 'list_holidays', outcome: (l) => says(l, /^No/) },
+  { message: 'How many holidays are left this year?', tool: 'list_holidays', outcome: (l) => says(l, /3 holidays/) },
+  { message: 'When is Diwali?', tool: 'list_holidays', outcome: (l) => says(l, /Sun 8 Nov 2026/) },
+  { message: 'Any long weekends coming up?', tool: 'list_holidays', outcome: (l) => says(l, /Christmas/) },
+  { message: "Show next year's holidays", tool: 'list_holidays', outcome: (l) => says(l, /2027/) },
+  { message: 'What holidays do we have in January?', tool: 'list_holidays', outcome: (l) => says(l, /Republic Day/) },
+  { message: 'Add a holiday on 31 Dec', tool: 'list_holidays', outcome: (l) => says(l, /admin/) },
+  { message: 'Apply leave on 24 Dec', tool: 'none', outcome: (l) => says(l, /Leave/) },
+];
+
 // ---------------------------------------------------------------- the runner
 
 function recording(): ModelClient & { calls: ModelToolCall[]; texts: string[] } {
@@ -178,4 +266,8 @@ run(`Me page eval on ${env.OLLAMA_MODEL}`, () => {
   it('Leave', async () => expect(await evaluate(leaveModule, LEAVE, leaveApi)).toBeGreaterThanOrEqual(0.8), 20 * 60 * 1000);
   it('Attendance', async () => expect(await evaluate(attendanceModule, ATTENDANCE, attendanceApi)).toBeGreaterThanOrEqual(0.8), 20 * 60 * 1000);
   it('My expenses', async () => expect(await evaluate(myExpenseModule, EXPENSES, expenseApi)).toBeGreaterThanOrEqual(0.8), 20 * 60 * 1000);
+  it('Performance', async () => expect(await evaluate(performanceModule, PERFORMANCE, () => new FakePerformanceApi())).toBeGreaterThanOrEqual(0.8), 20 * 60 * 1000);
+  it('Profile', async () => expect(await evaluate(myProfileModule, PROFILE, profileApi)).toBeGreaterThanOrEqual(0.8), 20 * 60 * 1000);
+  it('Team', async () => expect(await evaluate(myTeamModule, TEAM, () => new FakeMeInfoApi())).toBeGreaterThanOrEqual(0.8), 20 * 60 * 1000);
+  it('Holidays', async () => expect(await evaluate(myHolidaysModule, HOLIDAYS, () => new FakeMeInfoApi())).toBeGreaterThanOrEqual(0.8), 20 * 60 * 1000);
 });

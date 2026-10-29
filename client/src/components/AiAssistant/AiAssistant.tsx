@@ -14,6 +14,8 @@ import { fetchEmployees } from '../../store/employees/employeesThunks';
 import { fetchMyClaims } from '../../store/expenses/expensesThunks';
 import { fetchAllCategories } from '../../store/expensesAdmin/expensesAdminThunks';
 import { refreshAfterLeaveChange } from '../../store/leave/leaveThunks';
+import { fetchMyDetails, fetchMyIntroduction } from '../../store/people/peopleThunks';
+import { fetchMyGoals, fetchMyReviews, fetchReviewsToWrite, fetchTeamGoals } from '../../store/performance/performanceThunks';
 import { fetchProjects } from '../../store/projects/projectsThunks';
 import { fetchRoles } from '../../store/roles/rolesThunks';
 import { fetchTasks } from '../../store/tasks/tasksThunks';
@@ -37,10 +39,14 @@ const MODULE_ROUTES: { prefix: string; module: string; example: string }[] = [
   { prefix: ROUTES.roles, module: 'roles', example: 'Create a role Auditor with all permissions' },
   { prefix: ROUTES.expenses, module: 'expenses', example: 'Show submitted claims for this month' },
   { prefix: ROUTES.auditLogs, module: 'auditLogs', example: 'Show deleted records in Projects last week' },
-  // The Me page: three of its seven tabs (docs/AI_ME_ASSISTANTS.md); the other four get the Navigation assistant.
+  // The Me page: an assistant on each of its seven tabs (docs/AI_ME_ASSISTANTS.md).
   { prefix: ROUTES.meLeave, module: 'leave', example: 'Apply for leave from 3 Nov to 5 Nov' },
   { prefix: `${ROUTES.me}/attendance`, module: 'attendance', example: 'Work from home tomorrow' },
   { prefix: `${ROUTES.me}/expenses`, module: 'my-expenses', example: 'New claim for client visit to Pune' },
+  { prefix: `${ROUTES.me}/performance`, module: 'performance', example: "I'm at 60% on the onboarding goal" },
+  { prefix: `${ROUTES.me}/profile`, module: 'my-profile', example: 'Set my hobbies to cycling and chess' },
+  { prefix: `${ROUTES.me}/team`, module: 'my-team', example: 'Who is on leave this week?' },
+  { prefix: `${ROUTES.me}/holidays`, module: 'my-holidays', example: 'When is the next holiday?' },
 ];
 
 // Every other page gets the Navigation assistant, which only opens pages (docs/AI_NAVIGATION_ASSISTANT.md).
@@ -92,6 +98,16 @@ function AssistantDrawer({ info, example, prefix }: { info: AiModuleInfo; exampl
       if (info.key === 'leave') void dispatch(refreshAfterLeaveChange());
       if (info.key === 'attendance') void dispatch(refreshMyAttendance());
       if (info.key === 'my-expenses') void dispatch(fetchMyClaims());
+      if (info.key === 'performance') {
+        void dispatch(fetchMyGoals());
+        void dispatch(fetchTeamGoals());
+        void dispatch(fetchMyReviews());
+        void dispatch(fetchReviewsToWrite());
+      }
+      if (info.key === 'my-profile') {
+        void dispatch(fetchMyIntroduction());
+        void dispatch(fetchMyDetails());
+      }
     },
     // The page behind the drawer follows a live answer (the Expenses tab and its filters), on its own page only.
     onView: (path) => {

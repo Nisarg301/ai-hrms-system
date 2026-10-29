@@ -1,5 +1,6 @@
 // Mirrors server/src/ai/types.ts and agent.service.ts (the AI assistant's API).
 
+import type { GoalStatus } from './performance';
 import type { PermissionEntry } from './role';
 
 export interface AiToolCallRef {
@@ -157,6 +158,42 @@ export interface AiClaimCategoryOption {
   receiptRequiredAbovePaise: number;
 }
 
+/** A goal, as in the New goal dialog. Dates are YYYY-MM-DD; `ownerId` '' = mine. */
+export interface AiGoalFormValues {
+  ownerId: string;
+  title: string;
+  description: string;
+  startDate: string;
+  dueDate: string;
+  /** null = none. */
+  weight: number | null;
+}
+
+/** A check-in, as in the goal drawer. */
+export interface AiCheckInFormValues {
+  progress: number;
+  status: GoalStatus;
+  comment: string;
+}
+
+/** A review: an answer per question id, the 1–5 rating, and whether to submit it. */
+export interface AiReviewFormValues {
+  answers: Record<string, string>;
+  rating: number | null;
+  submitNow: boolean;
+}
+
+/** '' = no date of birth (removes it). */
+export interface AiBirthdayFormValues {
+  dateOfBirth: string;
+}
+
+export interface AiIntroductionFormValues {
+  about: string;
+  hobbies: string;
+  lovesAboutJob: string;
+}
+
 export type AiCardForm =
   | { kind: 'employee'; mode: 'create' | 'update'; values: AiEmployeeFormValues }
   | { kind: 'role'; mode: 'create' | 'update'; values: AiRoleFormValues }
@@ -171,7 +208,14 @@ export type AiCardForm =
   | { kind: 'project'; mode: 'create' | 'update'; values: AiProjectFormValues }
   | { kind: 'department'; mode: 'create' | 'update'; values: AiDepartmentFormValues }
   /** `labels`: id → name for the project and members on the card, in case the form's lists lack them. */
-  | { kind: 'task'; mode: 'create' | 'update'; values: AiTaskFormValues; labels: Record<string, string> };
+  | { kind: 'task'; mode: 'create' | 'update'; values: AiTaskFormValues; labels: Record<string, string> }
+  /** `owners`: whose a new goal can be (my direct reports, or anyone for an admin); empty = mine. */
+  | { kind: 'goal'; mode: 'create' | 'update'; values: AiGoalFormValues; owners: { id: string; name: string }[] }
+  | { kind: 'checkin'; mode: 'update'; values: AiCheckInFormValues }
+  /** `questions`: the cycle's, in order. */
+  | { kind: 'review'; mode: 'update'; values: AiReviewFormValues; questions: { id: string; text: string }[] }
+  | { kind: 'birthday'; mode: 'update'; values: AiBirthdayFormValues }
+  | { kind: 'introduction'; mode: 'update'; values: AiIntroductionFormValues };
 
 /** Values sent back with Confirm when the card's form was edited. */
 export type AiFormValues =
@@ -185,7 +229,12 @@ export type AiFormValues =
   | AiProjectFormValues
   | AiDepartmentFormValues
   | AiTaskFormValues
-  | AiDocumentFormValues;
+  | AiDocumentFormValues
+  | AiGoalFormValues
+  | AiCheckInFormValues
+  | AiReviewFormValues
+  | AiBirthdayFormValues
+  | AiIntroductionFormValues;
 
 export interface AiConfirmCard {
   title: string;

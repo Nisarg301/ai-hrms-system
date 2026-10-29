@@ -9,6 +9,8 @@ import { AiDepartmentForm, validateDepartmentValues } from './AiDepartmentForm';
 import { AiDocumentForm, validateDocumentValues } from './AiDocumentForm';
 import { AiEmployeeForm, validateEmployeeValues } from './AiEmployeeForm';
 import { AiLeaveForm, validateLeaveValues } from './AiLeaveForm';
+import { AiCheckInForm, AiGoalForm, AiReviewForm, validateCheckInValues, validateGoalValues, validateReviewValues } from './AiPerformanceForms';
+import { AiBirthdayForm, AiIntroductionForm, validateBirthdayValues, validateIntroductionValues } from './AiProfileForms';
 import { AiFileField, fileProblem } from './AiFileField';
 import { AiProjectForm, validateProjectValues } from './AiProjectForm';
 import { AiRoleForm, validateRoleValues } from './AiRoleForm';
@@ -41,6 +43,11 @@ function validate(form: AiCardForm): Record<string, string> {
   if (form.kind === 'wfh') return validateWfhValues(form.values);
   if (form.kind === 'fix') return validateFixValues(form.values);
   if (form.kind === 'claim') return validateClaimValues(form.values, form.mode);
+  if (form.kind === 'goal') return validateGoalValues(form.values);
+  if (form.kind === 'checkin') return validateCheckInValues(form.values);
+  if (form.kind === 'review') return validateReviewValues(form.values, form.questions);
+  if (form.kind === 'birthday') return validateBirthdayValues(form.values);
+  if (form.kind === 'introduction') return validateIntroductionValues(form.values);
   return validateDepartmentValues(form.values);
 }
 
@@ -76,6 +83,21 @@ function CardForm({ form, errors, onChange }: { form: AiCardForm; errors: Record
   if (form.kind === 'claim') {
     return <AiClaimForm mode={form.mode} values={form.values} categories={form.categories} errors={errors} onChange={(values) => onChange({ ...form, values })} />;
   }
+  if (form.kind === 'goal') {
+    return <AiGoalForm mode={form.mode} values={form.values} owners={form.owners} errors={errors} onChange={(values) => onChange({ ...form, values })} />;
+  }
+  if (form.kind === 'checkin') {
+    return <AiCheckInForm values={form.values} errors={errors} onChange={(values) => onChange({ ...form, values })} />;
+  }
+  if (form.kind === 'review') {
+    return <AiReviewForm values={form.values} questions={form.questions} errors={errors} onChange={(values) => onChange({ ...form, values })} />;
+  }
+  if (form.kind === 'birthday') {
+    return <AiBirthdayForm values={form.values} errors={errors} onChange={(values) => onChange({ ...form, values })} />;
+  }
+  if (form.kind === 'introduction') {
+    return <AiIntroductionForm values={form.values} errors={errors} onChange={(values) => onChange({ ...form, values })} />;
+  }
   return <AiDepartmentForm values={form.values} errors={errors} onChange={(values) => onChange({ ...form, values })} />;
 }
 
@@ -96,7 +118,19 @@ export function AiConfirmCard({ action, live, onConfirm, onCancel }: AiConfirmCa
   const [fileError, setFileError] = useState<string | null>(null);
   // A claim's receipt follows the form: it turns required as the amount and category change.
   const needsFile = form?.kind === 'claim' ? claimNeedsReceipt(form.values, form.categories) : Boolean(card.file?.required);
-  const confirmLabel = form?.kind === 'claim' ? (form.values.submitNow ? 'Submit claim' : form.mode === 'create' ? 'Save as draft' : 'Save expense') : card.confirmLabel;
+  // A claim's and a review's Confirm follow their Submit now switch.
+  const confirmLabel =
+    form?.kind === 'claim'
+      ? form.values.submitNow
+        ? 'Submit claim'
+        : form.mode === 'create'
+          ? 'Save as draft'
+          : 'Save expense'
+      : form?.kind === 'review'
+        ? form.values.submitNow
+          ? 'Submit review'
+          : 'Save draft'
+        : card.confirmLabel;
   const pick = (picked: File) => {
     const problem = fileProblem(picked, card.file?.kind);
     setFileError(problem);

@@ -445,6 +445,12 @@ describe('what the first eval run showed (verbatim model calls)', () => {
     const content = '{"name":"update_task","parameters":{"task":"release notes","description":"",members":"Mike Johnson, me",status":""}}';
     expect(toolCallFromText(content)).toEqual({ name: 'update_task', args: { task: 'release notes', description: '', members: 'Mike Johnson, me', status: '' } });
   });
+
+  it('repairs keys with no quotes at all, and leaves good JSON alone (Me page eval)', () => {
+    const content = '{"name":"write_review","parameters":{"which":"",person":"Neha",review:""}} assistant\n\n{"name":"write"';
+    expect(toolCallFromText(content)).toEqual({ name: 'write_review', args: { which: '', person: 'Neha', review: '' } });
+    expect(toolCallFromText('{"name":"update_task","parameters":{"description":"Lunch, time: 2pm"}}')).toEqual({ name: 'update_task', args: { description: 'Lunch, time: 2pm' } });
+  });
 });
 
 describe('permissions follow the role matrix', () => {

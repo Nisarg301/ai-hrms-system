@@ -61,7 +61,7 @@ function pageList(canOpen: (page: AppPage) => boolean): AiResult {
  * this page's own data ("Show projects" on Projects), or of a page the user may not open, is the
  * module's work, and so is "Open project Apollo" on Projects.
  */
-export async function pageAnswer(request: PageRequest, ctx: ToolContext): Promise<AiResult | null> {
+export async function pageAnswer(request: PageRequest, ctx: ToolContext, shows: string[] = []): Promise<AiResult | null> {
   const denied = await accessFor(ctx);
   const canOpen = (page: AppPage) => !denied(page);
   const here = ctx.page;
@@ -79,7 +79,7 @@ export async function pageAnswer(request: PageRequest, ctx: ToolContext): Promis
   const choice = choosePage(request.matches, canOpen);
   if (request.kind === 'show') {
     const top = request.matches.filter((m) => m.length === Math.max(...request.matches.map((x) => x.length)));
-    if (choice.kind !== 'one' || top.some((m) => samePage(m.page.path, here))) return null;
+    if (choice.kind !== 'one' || top.some((m) => samePage(m.page.path, here) || shows.includes(m.page.key))) return null;
   }
   if (request.kind === 'more' && choice.kind === 'one' && samePage(choice.page.path, here)) return null;
 
@@ -102,10 +102,11 @@ export async function pageAnswer(request: PageRequest, ctx: ToolContext): Promis
 /**
  * The shared step of every turn (agent.service `runTurn`, step 1b): a message that asks for a
  * page, answered with no model call. `bare`: a page name alone counts too (the Navigation assistant).
+ * `shows`: pages whose "show" the module answers itself (AiModule.shows).
  */
-export async function pageTurn(message: string, ctx: ToolContext, opts: { bare?: boolean } = {}): Promise<AiResult | null> {
+export async function pageTurn(message: string, ctx: ToolContext, opts: { bare?: boolean; shows?: string[] } = {}): Promise<AiResult | null> {
   const request = readPageRequest(message, opts);
-  return request ? pageAnswer(request, ctx) : null;
+  return request ? pageAnswer(request, ctx, opts.shows) : null;
 }
 
 const goToInput = z.object({

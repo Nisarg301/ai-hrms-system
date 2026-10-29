@@ -1,6 +1,7 @@
 import { Alert, Card, Empty, Select, Skeleton, Tag, theme } from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../hooks/store';
 import { selectHolidays, selectHolidaysError, selectHolidaysStatus } from '../../../store/holidays/holidaysSelectors';
 import { fetchHolidays } from '../../../store/holidays/holidaysThunks';
@@ -16,6 +17,7 @@ export function groupByMonth(holidays: Holiday[]): { month: string; items: Holid
   return [...groups.entries()].map(([key, items]) => ({ month: dayjs(`${key}-01`).format('MMMM YYYY'), items }));
 }
 
+/** The holiday calendar for a year. The year is in the URL (?year=2027), so the Holidays assistant's answers can move it. */
 export function HolidaysTab() {
   const dispatch = useAppDispatch();
   const { token } = theme.useToken();
@@ -23,7 +25,19 @@ export function HolidaysTab() {
   const status = useAppSelector(selectHolidaysStatus);
   const error = useAppSelector(selectHolidaysError);
   const thisYear = dayjs().year();
-  const [year, setYear] = useState(thisYear);
+  const [params, setParams] = useSearchParams();
+  const asked = Number(params.get('year'));
+  const year = Number.isInteger(asked) && asked >= 2000 && asked <= 2100 ? asked : thisYear;
+  const years = [...new Set([thisYear - 1, thisYear, thisYear + 1, year])].sort();
+  const setYear = (y: number) =>
+    setParams(
+      (p) => {
+        if (y === thisYear) p.delete('year');
+        else p.set('year', String(y));
+        return p;
+      },
+      { replace: true }
+    );
   const today = dayjs().format('YYYY-MM-DD');
 
   useEffect(() => {
@@ -41,7 +55,7 @@ export function HolidaysTab() {
           aria-label="Year"
           value={year}
           onChange={setYear}
-          options={[thisYear - 1, thisYear, thisYear + 1].map((y) => ({ value: y, label: String(y) }))}
+          options={years.map((y) => ({ value: y, label: String(y) }))}
         />
       }
     >

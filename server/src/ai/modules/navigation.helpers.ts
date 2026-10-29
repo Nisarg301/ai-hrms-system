@@ -258,6 +258,10 @@ const MODULE_PAGES: Record<string, string> = {
   leave: '/me/leave',
   attendance: '/me/attendance',
   'my-expenses': '/me/expenses',
+  performance: '/me/performance',
+  'my-profile': '/me/profile',
+  'my-team': '/me/team',
+  'my-holidays': '/me/holidays',
   auditLogs: '/audit-logs',
 };
 export const moduleHome = (moduleKey: string): string | undefined => MODULE_PAGES[moduleKey];

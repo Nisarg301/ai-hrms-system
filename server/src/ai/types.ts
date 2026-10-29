@@ -211,6 +211,44 @@ export interface ClaimCategoryOption {
   receiptRequiredAbovePaise: number;
 }
 
+/** Values of the editable goal form, as in the New goal dialog. Dates are YYYY-MM-DD; `ownerId` '' = mine. */
+export interface GoalFormValues {
+  ownerId: string;
+  title: string;
+  description: string;
+  startDate: string;
+  dueDate: string;
+  /** null = none. */
+  weight: number | null;
+}
+
+export type GoalStatus = 'on_track' | 'at_risk' | 'behind' | 'completed' | 'cancelled';
+
+/** Values of the editable check-in form, as in the goal drawer. */
+export interface CheckInFormValues {
+  progress: number;
+  status: GoalStatus;
+  comment: string;
+}
+
+/** Values of the editable review form: an answer per question id, the 1–5 rating, and whether to submit. */
+export interface ReviewFormValues {
+  answers: Record<string, string>;
+  rating: number | null;
+  submitNow: boolean;
+}
+
+/** '' = no date of birth (removes it). */
+export interface BirthdayFormValues {
+  dateOfBirth: string;
+}
+
+export interface IntroductionFormValues {
+  about: string;
+  hobbies: string;
+  lovesAboutJob: string;
+}
+
 export type CardForm =
   | { kind: 'employee'; mode: 'create' | 'update'; values: EmployeeFormValues }
   | { kind: 'role'; mode: 'create' | 'update'; values: RoleFormValues }
@@ -221,6 +259,13 @@ export type CardForm =
   | { kind: 'fix'; mode: 'create'; values: FixFormValues }
   /** `categories`: the active ones with their rules, so the form knows when a receipt is needed. */
   | { kind: 'claim'; mode: 'create' | 'update'; values: ClaimFormValues; categories: ClaimCategoryOption[] }
+  /** `owners`: whose a new goal can be (the user's direct reports, or anyone for an admin); empty = the user's own. */
+  | { kind: 'goal'; mode: 'create' | 'update'; values: GoalFormValues; owners: { id: string; name: string }[] }
+  | { kind: 'checkin'; mode: 'update'; values: CheckInFormValues }
+  /** `questions`: the cycle's, in order. */
+  | { kind: 'review'; mode: 'update'; values: ReviewFormValues; questions: { id: string; text: string }[] }
+  | { kind: 'birthday'; mode: 'update'; values: BirthdayFormValues }
+  | { kind: 'introduction'; mode: 'update'; values: IntroductionFormValues }
   /** `categories`: the ones in use, for the form to suggest. */
   | { kind: 'document'; mode: 'create' | 'update'; values: DocumentFormValues; categories: string[] }
   | { kind: 'project'; mode: 'create' | 'update'; values: ProjectFormValues }
@@ -254,6 +299,11 @@ export interface ToolDraft {
   args: Record<string, unknown>;
   missing: string[];
   notSaved: string[];
+  /**
+   * The next reply is free text taken as it is (a review answer): it skips the small-talk and
+   * other-tab checks, so "Great teamwork this quarter" is an answer, not a thank-you.
+   */
+  freeText?: boolean;
 }
 
 export type Prepared =
@@ -369,6 +419,11 @@ export interface AiModule {
    * says where, answered before any tool runs. Null when it's this page's.
    */
   elsewhere?: (message: string) => string | null;
+  /**
+   * Pages (navigation keys) whose "show" this module answers itself, though they are other pages:
+   * "Show my profile" on the Profile tab means the details there, not the My profile page.
+   */
+  shows?: string[];
 }
 
 /** A failure the user should read as-is ("No department called 'Enginering'"). */

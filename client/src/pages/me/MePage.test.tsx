@@ -284,4 +284,12 @@ describe('Holidays', () => {
     renderMe('/me/holidays');
     expect(await screen.findByText(`No holidays have been added for ${dayjs().year()} yet.`)).toBeInTheDocument();
   });
+
+  it('shows the year in the URL, as the Holidays assistant sets it', async () => {
+    const next = dayjs().year() + 1;
+    db.holidays[String(next)] = [{ id: 'h9', name: 'New Year', date: `${next}-01-01`, description: '' }];
+    renderMe(`/me/holidays?year=${next}`);
+    expect(await screen.findByText('New Year')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Year' }).closest('.ant-select')).toHaveTextContent(String(next));
+  });
 });

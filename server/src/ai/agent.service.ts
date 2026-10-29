@@ -124,13 +124,21 @@ export function toolCallFromText(content: string): { name: string; args: Record<
   return 'malformed';
 }
 
-/** JSON.parse, forgiving the trailing commas llama3.2 leaves (`{"due":"",}`); null when it still fails. */
+/**
+ * JSON.parse, forgiving the trailing commas llama3.2 leaves (`{"due":"",}`), and then keys with no
+ * quotes at all (`review:""`, in the Me page eval); null when it still fails. The keys are only
+ * quoted on a retry, so JSON that parses is never touched.
+ */
 function parseLoose(text: string): unknown {
-  try {
-    return JSON.parse(text.replace(/,\s*([}\]])/g, '$1'));
-  } catch {
-    return null;
+  const trimmed = text.replace(/,\s*([}\]])/g, '$1');
+  for (const attempt of [trimmed, trimmed.replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":')]) {
+    try {
+      return JSON.parse(attempt);
+    } catch {
+      // the next attempt, or null
+    }
   }
+  return null;
 }
 
 /** What the model later reads about an answer: the text, plus the first rows of any table. */
@@ -243,6 +251,7 @@ export async function runTurn(input: TurnInput): Promise<void> {
   const dispatch = async (tool: AiTool, args: Record<string, unknown>, final = Boolean(input.toolCall), context = ctx): Promise<string | null> => {
     emit({ type: 'tool', name: tool.name, label: tool.label });
     if (tool.kind === 'read') {
+      if (conversation.draft?.freeText) setDraft(conversation, null);
       const result = await tool.run!(args, api, context);
       // An answer with files, or one the page follows or opens, always goes to the user as is: model text can't carry them.
       if (env.AI_FAST_READS || final || result.downloads?.length || result.view || result.goTo) {
@@ -295,25 +304,30 @@ export async function runTurn(input: TurnInput): Promise<void> {
       return;
     }
 
+    // A draft waiting for free text (a review answer) takes the reply as it is: steps 2 and 2b are
+    // skipped. It lasts only while the user answers: going to a page or a read ends it.
+    const answering = Boolean(conversation.draft?.freeText);
+
     // 1b. "Go to projects", "Jump to dashboard", "Where are leave types?": on every assistant, with
     //     no model call, and only to pages this user may open (docs/AI_NAVIGATION_ASSISTANT.md).
     //     First, so "Hey, take me to my leave" isn't taken for a greeting, nor a draft's reply.
-    const toPage = await pageTurn(latestText, ctx, { bare: module.key === NAVIGATION_KEY });
+    const toPage = await pageTurn(latestText, ctx, { bare: module.key === NAVIGATION_KEY, shows: module.shows });
     if (toPage) {
+      if (answering) setDraft(conversation, null);
       answer(toPage);
       return;
     }
 
     // 2. Thanks, greetings and goodbyes: a reply of their own, never a tool (a "thank you" once
     //    repeated the last download). A draft waiting for details is kept for the next message.
-    const chitChat = smallTalkReply(latestText);
+    const chitChat = answering ? null : smallTalkReply(latestText);
     if (chitChat) {
       answer({ text: chitChat });
       return;
     }
 
     // 2b. Another page's work ("Apply leave" on the Attendance tab): say where, with no tool.
-    const away = module.elsewhere?.(latestText);
+    const away = answering ? null : module.elsewhere?.(latestText);
     if (away) {
       answer({ text: away });
       return;

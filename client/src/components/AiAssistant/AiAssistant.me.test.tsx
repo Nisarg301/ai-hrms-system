@@ -23,6 +23,11 @@ const MODULES: AiModuleInfo[] = [
   { key: 'leave', title: 'Leave assistant', intro: 'Apply for leave.', starters: [] },
   { key: 'attendance', title: 'Attendance assistant', intro: 'Work from home and fixes.', starters: [] },
   { key: 'my-expenses', title: 'Expenses assistant', intro: 'Your claims.', starters: [{ label: 'New claim', toolCall: { name: 'create_claim', args: {} } }] },
+  { key: 'performance', title: 'Performance assistant', intro: 'Goals and reviews.', starters: [] },
+  { key: 'my-profile', title: 'Profile assistant', intro: 'Your profile.', starters: [] },
+  { key: 'my-team', title: 'Team assistant', intro: 'Your team.', starters: [] },
+  { key: 'my-holidays', title: 'Holidays assistant', intro: 'The holiday calendar.', starters: [] },
+  { key: 'navigation', title: 'Navigation assistant', intro: 'Opens pages.', starters: [] },
 ];
 
 // A new claim's card: ₹400 in Other, under its ₹500 receipt limit, so the receipt is optional.
@@ -104,20 +109,20 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('AiAssistant on the Me page', () => {
+  // Each of the seven tabs has its own assistant, so none shows the Navigation assistant.
   it.each([
     ['/me/leave', 'leave'],
     ['/me/attendance', 'attendance'],
     ['/me/expenses', 'expenses'],
-  ])('is on %s', async (path, name) => {
+    ['/me/performance', 'performance'],
+    ['/me/performance?section=reviews', 'performance'],
+    ['/me/profile', 'profile'],
+    ['/me/team', 'team'],
+    ['/me/holidays', 'holidays'],
+  ])('has its own assistant on %s', async (path, name) => {
     renderAt(path);
     expect(await screen.findByRole('button', { name: new RegExp(`open the ${name} assistant`, 'i') })).toBeInTheDocument();
-  });
-
-  it.each(['/me/performance', '/me/profile', '/me/team', '/me/holidays'])('is not on %s', async (path) => {
-    renderAt(path);
-    // The module list never loads for a page without an assistant.
-    await new Promise((r) => setTimeout(r, 50));
-    expect(screen.queryByRole('button', { name: /assistant/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /open the navigation assistant/i })).not.toBeInTheDocument();
   });
 
   it('turns the receipt required as the amount goes over the limit, and sends the edited values with the file', async () => {

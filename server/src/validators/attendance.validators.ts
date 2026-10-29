@@ -30,7 +30,7 @@ export const updateSettingsSchema = z
     }
   });
 
-/** Optional, as for leave and an admin's recorded fix (docs/AI_ME_ASSISTANTS.md, section 7). */
+/** Optional, as for leave and an admin's recorded fix (docs/AI_ME_ASSISTANTS.md, section 11). */
 const reason = z.string().trim().max(500).default('');
 
 /** An employee's request: a fix to one day, or work from home for a range. */

@@ -2,40 +2,40 @@ import { EditOutlined } from '@ant-design/icons';
 import { Button, DatePicker, message, Space, theme } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
-import { getMyDetailsRequest, updateMyDetailsRequest } from '../../../services/endpoints/me.endpoints';
-import { ApiError } from '../../../types/api';
-import { leaveErrorMessage } from '../../../components/ApplyLeaveDrawer/ApplyLeaveDrawer';
+import { useAppDispatch, useAppSelector } from '../../../hooks/store';
+import { selectMyDetails, selectMyDetailsStatus } from '../../../store/people/peopleSelectors';
+import { fetchMyDetails, saveMyDetails } from '../../../store/people/peopleThunks';
 
-/** My own date of birth, which I can set or clear. Colleagues only see the day and month. */
+/**
+ * My own date of birth, which I can set or clear. Colleagues only see the day and month. Kept in
+ * the people store, so it reloads after the Profile assistant changes it.
+ */
 export function MyDateOfBirth() {
+  const dispatch = useAppDispatch();
   const { token } = theme.useToken();
-  const [value, setValue] = useState<string | null | undefined>(undefined);
+  const details = useAppSelector(selectMyDetails);
+  const status = useAppSelector(selectMyDetailsStatus);
   const [draft, setDraft] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    let current = true;
-    getMyDetailsRequest()
-      .then(({ data }) => current && setValue(data.dateOfBirth))
-      .catch(() => current && setValue(null));
-    return () => {
-      current = false;
-    };
-  }, []);
+    void dispatch(fetchMyDetails());
+  }, [dispatch]);
+
+  // Unknown while the first load runs; "Not set" if it failed.
+  const value = details ? details.dateOfBirth : status === 'failed' ? null : undefined;
 
   const save = async (next: string | null) => {
     setSaving(true);
-    try {
-      const { data } = await updateMyDetailsRequest({ dateOfBirth: next });
-      setValue(data.dateOfBirth);
-      setEditing(false);
-      void message.success(next ? 'Date of birth saved' : 'Date of birth removed');
-    } catch (err) {
-      void message.error(leaveErrorMessage(err instanceof ApiError ? err : new ApiError(0, 'Could not save')));
-    } finally {
-      setSaving(false);
+    const result = await dispatch(saveMyDetails({ dateOfBirth: next }));
+    setSaving(false);
+    if (saveMyDetails.rejected.match(result)) {
+      void message.error(result.payload ?? 'Could not save');
+      return;
     }
+    setEditing(false);
+    void message.success(next ? 'Date of birth saved' : 'Date of birth removed');
   };
 
   if (value === undefined) return <span>…</span>;
